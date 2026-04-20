@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- CHESS Reader · v0.6.2 -->
+<!-- CHESS Reader · v0.6.3 -->
 
 <html lang="en">
 <head>
@@ -75,7 +75,7 @@ display: flex;
 align-items: center;
 padding: 0 16px;
 background: #ffffff;
-border-bottom: 1px solid #0a0a0a;
+border-bottom: 1px solid #c4bfb1;
 z-index: 10;
 }
 
@@ -162,7 +162,7 @@ flex: 0 0 340px;
 display: flex;
 flex-direction: column;
 background: #ffffff;
-border-right: 1px solid #0a0a0a;
+border-right: 1px solid #c4bfb1;
 overflow: hidden;
 min-height: 0;
 }
@@ -178,11 +178,10 @@ background: #ffffff;
 border-bottom: var(–line);
 }
 .panel-title {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 12px;
-font-weight: 700;
-letter-spacing: 0.16em;
-text-transform: uppercase;
+font-family: ‘Fraunces’, serif;
+font-size: 18px;
+font-weight: 500;
+letter-spacing: -0.01em;
 color: var(–text-1);
 }
 .panel-meta {
@@ -192,16 +191,55 @@ color: var(–text-3);
 letter-spacing: 0.04em;
 }
 .panel-action {
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 10px;
+font-family: ‘Inter’, sans-serif;
+font-size: 11px;
 color: var(–teal);
 cursor: pointer;
-letter-spacing: 0.06em;
+letter-spacing: 0.08em;
 text-transform: uppercase;
 font-weight: 700;
 text-decoration: none;
 }
 .panel-action:hover { text-decoration: underline; }
+
+.report-num {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 13px;
+color: var(–gold);
+font-weight: 600;
+letter-spacing: 0.02em;
+margin-left: 2px;
+}
+
+.report-header-right {
+display: flex;
+align-items: center;
+gap: 14px;
+}
+
+.download-btn {
+display: inline-flex;
+align-items: center;
+gap: 6px;
+padding: 5px 11px;
+background: #ffffff;
+border: 1px solid #c4bfb1;
+border-radius: 6px;
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 10px;
+font-weight: 700;
+letter-spacing: 0.1em;
+text-transform: uppercase;
+color: var(–text-1);
+cursor: pointer;
+transition: all 0.15s ease;
+}
+.download-btn:hover {
+background: #fafaf7;
+border-color: var(–text-1);
+transform: translateY(-1px);
+}
+.download-btn svg { color: var(–text-2); }
 
 .chat-messages {
 flex: 1 1 auto;
@@ -377,7 +415,7 @@ flex-direction: column;
 flex: 0 0 360px;
 min-height: 0;
 display: flex;
-border-bottom: 1px solid #0a0a0a;
+border-bottom: 1px solid #c4bfb1;
 }
 
 /* Graph panel */
@@ -923,7 +961,7 @@ font-weight: 600;
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark">C</div>
-      <span>CHESS<em>·</em>Reader <span class="version">v0.6.2</span></span>
+      <span>CHESS<em>·</em>Reader <span class="version">v0.6.3</span></span>
     </div>
     <div class="topbar-center">
       <span class="breadcrumb-item">Workspaces</span>
@@ -1025,7 +1063,7 @@ font-weight: 600;
     <section class="graph-panel">
       <div class="panel-header">
         <span class="panel-title">Graph</span>
-        <span class="panel-action">Expand ↗</span>
+        <span class="panel-action">Expand</span>
       </div>
       <div class="graph-controls">
         <button class="graph-ctrl active">Full</button>
@@ -1237,8 +1275,14 @@ font-weight: 600;
   <!-- REPORT -->
   <section class="report-panel">
     <div class="panel-header">
-      <span class="panel-title">Report · #3</span>
-      <span class="panel-meta">Apr 20, 2026 · 14:02 UTC</span>
+      <span class="panel-title">Report <span class="report-num">#3</span></span>
+      <div class="report-header-right">
+        <span class="panel-meta">Apr 20, 2026 · 14:02 UTC</span>
+        <button class="download-btn" title="Download report">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>PDF</span>
+        </button>
+      </div>
     </div>
     <div class="report-scroll">
       <article class="report">
@@ -1354,7 +1398,7 @@ font-weight: 600;
 </div>
 
 <script>
-  const APP_VERSION = "0.6.2";
+  const APP_VERSION = "0.6.3";
   console.log(`CHESS Reader ${APP_VERSION}`);
 
   document.querySelectorAll('.graph-ctrl').forEach(btn => {
