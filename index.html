@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- CHESS Reader · v0.6.3 -->
+<!-- CHESS Reader · v0.7.0 -->
 
 <html lang="en">
 <head>
@@ -9,7 +9,7 @@
 <meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<title>CHESS Reader -- Iran / Hormuz Dossier</title>
+<title>CHESS Reader</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -39,9 +39,7 @@
 --bubble-user:      #1e3a8a;
 --bubble-user-text: #ffffff;
 
-/* Border -- sharp, thin, elegant */
---line: 1px solid #0f0f0f;
---line-soft: 1px solid #d9d6ce;
+--line-hair: 1px solid #c4bfb1;
 ```
 
 }
@@ -75,8 +73,9 @@ display: flex;
 align-items: center;
 padding: 0 16px;
 background: #ffffff;
-border-bottom: 1px solid #c4bfb1;
+border-bottom: var(–line-hair);
 z-index: 10;
+gap: 14px;
 }
 
 .brand {
@@ -88,6 +87,7 @@ font-weight: 600;
 font-size: 18px;
 letter-spacing: -0.01em;
 color: var(–text-1);
+text-decoration: none;
 }
 .brand-mark {
 width: 28px; height: 28px;
@@ -108,6 +108,29 @@ margin-left: 6px;
 font-weight: 400;
 }
 
+#topbar-left-extra {
+display: flex;
+align-items: center;
+}
+.back-to-atlas {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 11px;
+font-weight: 700;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+color: var(–text-2);
+text-decoration: none;
+padding: 5px 10px;
+border: 1px solid #c4bfb1;
+border-radius: 6px;
+transition: all 0.15s ease;
+}
+.back-to-atlas:hover {
+background: #fafaf7;
+border-color: var(–text-1);
+color: var(–text-1);
+}
+
 .topbar-center {
 flex: 1;
 display: flex;
@@ -116,9 +139,19 @@ justify-content: center;
 gap: 10px;
 font-size: 13px;
 color: var(–text-2);
+min-width: 0;
 }
-.breadcrumb-item { display: flex; align-items: center; gap: 6px; }
-.breadcrumb-item .dot { width: 4px; height: 4px; border-radius: 50%; background: var(–text-4); }
+.breadcrumb-item {
+display: flex;
+align-items: center;
+gap: 6px;
+color: var(–text-2);
+text-decoration: none;
+}
+.breadcrumb-link:hover { color: var(–text-1); text-decoration: underline; }
+.breadcrumb-item .dot, .topbar-center > .dot {
+width: 4px; height: 4px; border-radius: 50%; background: var(–text-4);
+}
 .dossier-pill {
 padding: 4px 11px;
 background: #ffffff;
@@ -144,30 +177,154 @@ transition: all 0.15s ease;
 }
 .icon-btn:hover {
 background: var(–bg-well);
-border-color: #0f0f0f;
+border-color: var(–text-1);
 color: var(–text-1);
 }
 
-/* ============ MAIN BODY ============ */
-.body-row {
+/* ============ APP ROOT ============ */
+#app-root {
+flex: 1 1 auto;
+min-height: 0;
+display: flex;
+flex-direction: column;
+background: #ffffff;
+}
+
+/* ============ ATLAS VIEW ============ */
+.atlas-view {
+flex: 1 1 auto;
+min-height: 0;
+display: flex;
+flex-direction: column;
+background: #ffffff;
+overflow: hidden;
+}
+.atlas-header {
+flex: 0 0 auto;
+padding: 28px 48px 16px;
+border-bottom: var(–line-hair);
+}
+.atlas-title {
+font-family: ‘Fraunces’, serif;
+font-weight: 500;
+font-size: 36px;
+letter-spacing: -0.025em;
+color: var(–text-1);
+margin-bottom: 6px;
+}
+.atlas-subtitle {
+font-family: ‘Fraunces’, serif;
+font-size: 16px;
+font-style: italic;
+font-weight: 300;
+color: var(–text-3);
+}
+.atlas-map-wrap {
+flex: 1 1 auto;
+min-height: 0;
+position: relative;
+padding: 20px 40px 10px;
+}
+.atlas-map {
+width: 100%;
+height: 100%;
+display: block;
+}
+
+.continents polygon { transition: fill 0.2s ease; }
+
+.cluster-marker {
+cursor: pointer;
+transition: transform 0.2s ease;
+}
+.cluster-marker.has-data { color: var(–teal); }
+.cluster-marker.empty { color: #c4bfb1; cursor: default; }
+
+.cluster-dot {
+fill: currentColor;
+transition: r 0.2s ease, fill 0.2s ease;
+}
+.cluster-marker.has-data:hover .cluster-dot { r: 17; }
+.cluster-marker.has-data:hover .cluster-ring { opacity: 0.8; }
+.cluster-marker.has-data:hover { transform: translate(var(–x), var(–y)) scale(1.02); }
+
+.cluster-count {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 11px;
+font-weight: 700;
+fill: #ffffff;
+pointer-events: none;
+}
+.cluster-label {
+font-family: ‘Fraunces’, serif;
+font-size: 14px;
+font-weight: 500;
+letter-spacing: -0.005em;
+fill: var(–text-1);
+pointer-events: none;
+}
+.cluster-marker.empty .cluster-label { fill: var(–text-4); }
+
+.orbital-item {
+cursor: pointer;
+color: var(–violet);
+}
+.orbital-dot {
+fill: currentColor;
+transition: r 0.2s ease;
+}
+.orbital-item:hover .orbital-dot { r: 13; }
+.orbital-label {
+font-family: ‘Fraunces’, serif;
+font-size: 13px;
+font-weight: 500;
+fill: var(–text-1);
+pointer-events: none;
+}
+
+.atlas-legend {
+flex: 0 0 auto;
+display: flex;
+gap: 24px;
+padding: 12px 48px 18px;
+border-top: var(–line-hair);
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 10px;
+color: var(–text-3);
+font-weight: 600;
+letter-spacing: 0.04em;
+text-transform: uppercase;
+}
+.legend-group { display: flex; align-items: center; gap: 6px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.empty-state {
+padding: 80px 40px;
+text-align: center;
+font-family: ‘Fraunces’, serif;
+font-size: 18px;
+color: var(–text-3);
+}
+.empty-state a { color: var(–teal); text-decoration: underline; }
+
+/* ============ DOSSIER VIEW ============ */
+.dossier-view {
 flex: 1 1 auto;
 min-height: 0;
 display: flex;
 background: #ffffff;
 }
 
-/* ============ CHAT PANEL ============ */
 .chat-panel {
 flex: 0 0 340px;
 display: flex;
 flex-direction: column;
 background: #ffffff;
-border-right: 1px solid #c4bfb1;
+border-right: var(–line-hair);
 overflow: hidden;
 min-height: 0;
 }
 
-/* Panel header -- shared */
 .panel-header {
 flex: 0 0 auto;
 display: flex;
@@ -175,7 +332,7 @@ align-items: center;
 justify-content: space-between;
 padding: 11px 16px;
 background: #ffffff;
-border-bottom: var(–line);
+border-bottom: var(–line-hair);
 }
 .panel-title {
 font-family: ‘Fraunces’, serif;
@@ -210,13 +367,11 @@ font-weight: 600;
 letter-spacing: 0.02em;
 margin-left: 2px;
 }
-
 .report-header-right {
 display: flex;
 align-items: center;
 gap: 14px;
 }
-
 .download-btn {
 display: inline-flex;
 align-items: center;
@@ -266,37 +421,30 @@ text-transform: uppercase;
 font-weight: 600;
 }
 .day-sep::before, .day-sep::after {
-content: ‘’;
-flex: 1;
-height: 1px;
-background: #d9d6ce;
+content: ‘’; flex: 1; height: 1px; background: #d9d6ce;
 }
 
-/* Messages -- no sender label, distinction from alignment + bubble style only */
 .msg {
 display: flex;
 flex-direction: column;
 max-width: 85%;
 animation: slideIn 0.3s ease;
 }
-.msg.user { align-self: flex-end;   align-items: flex-end; }
-.msg.ai   { align-self: flex-start; align-items: flex-start; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.ai { align-self: flex-start; align-items: flex-start; }
 
 .msg-bubble {
-position: relative;
 padding: 10px 14px;
 font-size: 13.5px;
 line-height: 1.5;
 word-wrap: break-word;
 max-width: 100%;
 }
-/* User: navy fill, rounded all + asymmetric corner bottom-right */
 .msg.user .msg-bubble {
 background: #1e3a8a;
 color: #ffffff;
 border-radius: 14px 14px 4px 14px;
 }
-/* AI: white fill with thin black border, asymmetric corner bottom-left */
 .msg.ai .msg-bubble {
 background: #ffffff;
 color: var(–text-1);
@@ -305,7 +453,7 @@ border-radius: 14px 14px 14px 4px;
 }
 .msg-bubble strong { font-weight: 600; }
 .msg.user .msg-bubble strong { color: #ffffff; }
-.msg.ai   .msg-bubble strong { color: var(–teal); }
+.msg.ai .msg-bubble strong { color: var(–teal); }
 
 .msg-time {
 margin-top: 4px;
@@ -329,10 +477,10 @@ font-family: ‘JetBrains Mono’, monospace;
 font-size: 11px;
 color: var(–teal);
 cursor: pointer;
-transition: all 0.15s ease;
 text-decoration: none;
 font-weight: 600;
 align-self: flex-start;
+transition: all 0.15s ease;
 }
 .msg-link:hover { background: #d2e9e4; transform: translateY(-1px); }
 
@@ -349,7 +497,7 @@ animation: dots 1.4s infinite;
 flex: 0 0 auto;
 padding: 12px 14px 14px;
 background: #ffffff;
-border-top: var(–line);
+border-top: var(–line-hair);
 }
 .chat-input-box {
 background: #ffffff;
@@ -401,7 +549,6 @@ transform: translateY(-1px);
 background: #0a6158;
 }
 
-/* ============ RIGHT AREA ============ */
 .right-area {
 flex: 1 1 auto;
 min-width: 0;
@@ -410,15 +557,13 @@ display: flex;
 flex-direction: column;
 }
 
-/* ============ UPPER STRIP ============ */
 .upper-strip {
 flex: 0 0 360px;
 min-height: 0;
 display: flex;
-border-bottom: 1px solid #c4bfb1;
+border-bottom: var(–line-hair);
 }
 
-/* Graph panel */
 .graph-panel {
 flex: 1 1 auto;
 min-width: 0;
@@ -480,13 +625,11 @@ padding: 8px 16px 10px;
 flex-wrap: wrap;
 font-family: ‘JetBrains Mono’, monospace;
 font-size: 10px;
-border-top: var(–line-soft);
+border-top: 1px solid #efece4;
 background: #ffffff;
 }
 .legend-item { display: flex; align-items: center; gap: 5px; color: var(–text-3); font-weight: 600; }
-.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 
-/* Intel panel */
 .intel-panel {
 flex: 0 0 320px;
 min-height: 0;
@@ -505,7 +648,7 @@ overflow-y: auto;
 
 .intel-section {
 padding: 14px 16px;
-border-bottom: var(–line-soft);
+border-bottom: 1px solid #efece4;
 }
 .intel-section:last-child { border-bottom: none; }
 .intel-header {
@@ -514,7 +657,6 @@ align-items: baseline;
 justify-content: space-between;
 margin-bottom: 10px;
 }
-/* Two-tier hierarchy -- panel-title is mono upper, section-title is serif */
 .intel-sec-title {
 font-family: ‘Fraunces’, serif;
 font-size: 15px;
@@ -629,7 +771,7 @@ margin-bottom: 2px;
 }
 .tl-title { font-size: 11.5px; color: var(–text-1); line-height: 1.4; }
 
-/* ============ REPORT PANEL ============ */
+/* Report */
 .report-panel {
 flex: 1 1 auto;
 min-height: 0;
@@ -957,19 +1099,13 @@ font-weight: 600;
 <body>
 
 <div class="app">
-
   <header class="topbar">
-    <div class="brand">
+    <a class="brand" href="#atlas">
       <div class="brand-mark">C</div>
-      <span>CHESS<em>·</em>Reader <span class="version">v0.6.3</span></span>
-    </div>
-    <div class="topbar-center">
-      <span class="breadcrumb-item">Workspaces</span>
-      <span class="dot"></span>
-      <span class="breadcrumb-item">Middle East</span>
-      <span class="dot"></span>
-      <span class="dossier-pill">DOSSIER · IRAN-HORMUZ</span>
-    </div>
+      <span>CHESS<em>·</em>Reader <span class="version">v0.7.0</span></span>
+    </a>
+    <div id="topbar-left-extra"></div>
+    <div class="topbar-center" id="topbar-center"></div>
     <div class="topbar-right">
       <button class="icon-btn" title="Export">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -983,439 +1119,12 @@ font-weight: 600;
     </div>
   </header>
 
-  <div class="body-row">
-
-```
-<!-- CHAT -->
-<aside class="chat-panel">
-  <div class="panel-header">
-    <span class="panel-title">Chat</span>
-    <span class="panel-meta">14 msg · Session</span>
-  </div>
-
-  <div class="chat-messages">
-
-    <div class="day-sep">Today · Apr 20</div>
-
-    <div class="msg user">
-      <div class="msg-bubble">What is the current state of tensions in the Hormuz Strait given Iran's posture?</div>
-      <div class="msg-time">14:02</div>
-    </div>
-
-    <div class="msg ai">
-      <div class="msg-bubble">Produced a full analysis spanning <strong>12 entities</strong> and <strong>28 relations</strong>. Overall system volatility is elevated, with two high-weight negative arcs dominating the picture.</div>
-      <a class="msg-link">↗ Report #3 →</a>
-      <div class="msg-time">14:02</div>
-    </div>
-
-    <div class="msg user">
-      <div class="msg-bubble">Why did you classify IRGC-Navy as an actor rather than an asset of the broader Iranian state?</div>
-      <div class="msg-time">14:07</div>
-    </div>
-
-    <div class="msg ai">
-      <div class="msg-bubble">Topology-based: IRGC-Navy has 7 outgoing arcs representing autonomous decisions vs 3 incoming. Multiple sources attribute agency at the organisational level below central command.</div>
-      <div class="msg-time">14:07</div>
-    </div>
-
-    <div class="msg user">
-      <div class="msg-bubble">What happens if US Fifth Fleet withdraws 50% of carrier presence for 90 days?</div>
-      <div class="msg-time">14:11</div>
-    </div>
-
-    <div class="msg ai">
-      <div class="msg-bubble">Scenario evaluated. <strong>Three tipping points</strong> identified within the 90-day window, with GCC insurance premia projected to surge 40–65%.</div>
-      <a class="msg-link">↗ Report #4 →</a>
-      <div class="msg-time">14:12</div>
-    </div>
-
-    <div class="msg user">
-      <div class="msg-bubble">Tell me more about the "Strait closure escalation" tipping point.</div>
-      <div class="msg-time">14:19</div>
-    </div>
-
-    <div class="msg ai pending">
-      <div class="msg-bubble">Analysing subgraph and retrieving source passages<span class="dots"></span></div>
-      <div class="msg-time">now</div>
-    </div>
-
-  </div>
-
-  <div class="chat-input-wrap">
-    <div class="chat-input-box">
-      <textarea placeholder="Ask a follow-up, or start a new analysis…"></textarea>
-      <div class="chat-input-actions">
-        <button class="send-btn">
-          Run
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</aside>
-
-<!-- RIGHT AREA -->
-<div class="right-area">
-
-  <div class="upper-strip">
-
-    <!-- GRAPH -->
-    <section class="graph-panel">
-      <div class="panel-header">
-        <span class="panel-title">Graph</span>
-        <span class="panel-action">Expand</span>
-      </div>
-      <div class="graph-controls">
-        <button class="graph-ctrl active">Full</button>
-        <button class="graph-ctrl">Actors</button>
-        <button class="graph-ctrl">Assets</button>
-        <button class="graph-ctrl">Events</button>
-      </div>
-      <div class="graph-svg-wrap">
-        <svg class="graph-svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="glowTeal" cx="50%" cy="50%">
-              <stop offset="0%" stop-color="#0d7a6e" stop-opacity="0.22"/>
-              <stop offset="100%" stop-color="#0d7a6e" stop-opacity="0"/>
-            </radialGradient>
-            <radialGradient id="glowAmber" cx="50%" cy="50%">
-              <stop offset="0%" stop-color="#a8570f" stop-opacity="0.22"/>
-              <stop offset="100%" stop-color="#a8570f" stop-opacity="0"/>
-            </radialGradient>
-            <radialGradient id="glowViolet" cx="50%" cy="50%">
-              <stop offset="0%" stop-color="#5b21b6" stop-opacity="0.22"/>
-              <stop offset="100%" stop-color="#5b21b6" stop-opacity="0"/>
-            </radialGradient>
-            <marker id="arrowCoral" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-              <path d="M0,0 L10,5 L0,10 z" fill="#b8203a"/>
-            </marker>
-            <marker id="arrowSage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-              <path d="M0,0 L10,5 L0,10 z" fill="#15803d"/>
-            </marker>
-            <marker id="arrowMuted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-              <path d="M0,0 L10,5 L0,10 z" fill="#9e9b94"/>
-            </marker>
-          </defs>
-
-          <g stroke="#e8e4d6" stroke-width="0.5" opacity="0.7">
-            <line x1="0" y1="90" x2="720" y2="90"/>
-            <line x1="0" y1="180" x2="720" y2="180"/>
-            <line x1="0" y1="270" x2="720" y2="270"/>
-            <line x1="180" y1="0" x2="180" y2="360"/>
-            <line x1="360" y1="0" x2="360" y2="360"/>
-            <line x1="540" y1="0" x2="540" y2="360"/>
-          </g>
-
-          <path d="M 160 110 Q 360 160 560 210" stroke="#b8203a" stroke-width="3.5" fill="none" marker-end="url(#arrowCoral)" opacity="0.85"/>
-          <path d="M 160 280 Q 120 190 155 115" stroke="#b8203a" stroke-width="2.5" fill="none" marker-end="url(#arrowCoral)" opacity="0.65"/>
-          <path d="M 360 60 Q 270 80 170 105" stroke="#9e9b94" stroke-width="1.5" fill="none" marker-end="url(#arrowMuted)" opacity="0.55"/>
-          <path d="M 580 90 Q 600 150 570 205" stroke="#15803d" stroke-width="2.5" fill="none" marker-end="url(#arrowSage)" opacity="0.7"/>
-          <path d="M 165 115 Q 370 180 558 210" stroke="#b8203a" stroke-width="2" fill="none" marker-end="url(#arrowCoral)" opacity="0.45"/>
-          <path d="M 390 310 Q 475 260 560 215" stroke="#15803d" stroke-width="2" fill="none" marker-end="url(#arrowSage)" opacity="0.55"/>
-          <path d="M 390 295 Q 380 180 370 75" stroke="#9e9b94" stroke-width="1.2" fill="none" marker-end="url(#arrowMuted)" opacity="0.45" stroke-dasharray="4,4"/>
-
-          <g class="graph-node">
-            <circle cx="160" cy="110" r="26" fill="url(#glowTeal)"/>
-            <circle cx="160" cy="110" r="13" fill="#ffffff" stroke="#0d7a6e" stroke-width="3"/>
-            <text class="graph-label" x="160" y="146" text-anchor="middle">IRGC-NAVY</text>
-          </g>
-          <g class="graph-node">
-            <circle cx="360" cy="60" r="20" fill="url(#glowTeal)"/>
-            <circle cx="360" cy="60" r="10" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/>
-            <text class="graph-label" x="360" y="38" text-anchor="middle">IRAN (STATE)</text>
-          </g>
-          <g class="graph-node">
-            <circle cx="160" cy="280" r="20" fill="url(#glowTeal)"/>
-            <circle cx="160" cy="280" r="10" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/>
-            <text class="graph-label" x="160" y="306" text-anchor="middle">US 5TH FLEET</text>
-          </g>
-          <g class="graph-node">
-            <circle cx="580" cy="90" r="18" fill="url(#glowTeal)"/>
-            <circle cx="580" cy="90" r="9" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/>
-            <text class="graph-label" x="580" y="68" text-anchor="middle">GCC</text>
-          </g>
-          <g class="graph-node">
-            <circle cx="390" cy="315" r="17" fill="url(#glowTeal)"/>
-            <circle cx="390" cy="315" r="8" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/>
-            <text class="graph-label" x="390" y="340" text-anchor="middle">UKMTO</text>
-          </g>
-
-          <g class="graph-node">
-            <circle cx="560" cy="215" r="28" fill="url(#glowAmber)"/>
-            <rect x="548" y="203" width="24" height="24" rx="3" fill="#ffffff" stroke="#a8570f" stroke-width="3" transform="rotate(45 560 215)"/>
-            <text class="graph-label" x="560" y="252" text-anchor="middle" fill="#a8570f">HORMUZ</text>
-          </g>
-          <g class="graph-node">
-            <circle cx="390" cy="295" r="16" fill="url(#glowAmber)"/>
-            <rect x="383" y="288" width="14" height="14" rx="2" fill="#ffffff" stroke="#a8570f" stroke-width="2.5" transform="rotate(45 390 295)"/>
-          </g>
-
-          <g class="graph-node">
-            <circle cx="310" cy="200" r="16" fill="url(#glowViolet)"/>
-            <polygon points="310,190 320,204 300,204" fill="#ffffff" stroke="#5b21b6" stroke-width="2.5"/>
-            <text class="graph-label" x="310" y="228" text-anchor="middle" fill="#5b21b6">JAN 18</text>
-          </g>
-        </svg>
-      </div>
-      <div class="legend">
-        <div class="legend-item"><span class="legend-dot" style="background:#0d7a6e"></span>Actor</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#a8570f"></span>Asset</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#5b21b6"></span>Event</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#b8203a"></span>Negative arc</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#15803d"></span>Positive arc</div>
-      </div>
-    </section>
-
-    <!-- INTEL -->
-    <aside class="intel-panel">
-      <div class="panel-header">
-        <span class="panel-title">Intel</span>
-      </div>
-      <div class="intel-body">
-
-        <div class="intel-section">
-          <div class="intel-header">
-            <span class="intel-sec-title">Confidence</span>
-            <span class="panel-action">Breakdown</span>
-          </div>
-          <div class="confidence-block">
-            <div class="gauge">
-              <svg width="58" height="58" viewBox="0 0 58 58">
-                <circle cx="29" cy="29" r="23" fill="none" stroke="#ebe8df" stroke-width="5"/>
-                <circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="144.5" stroke-dashoffset="26"/>
-              </svg>
-              <div class="gauge-text">0.82</div>
-            </div>
-            <div class="confidence-meta">
-              <div class="big">High confidence</div>
-              <div class="small">Corroborated across ≥3 sources. Weakest: GNSS attribution (0.64), China-Iran (0.59).</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="intel-section">
-          <div class="intel-header">
-            <span class="intel-sec-title">Top arcs</span>
-            <span class="panel-action">All 28</span>
-          </div>
-          <div class="arc-list">
-            <div class="arc-item">
-              <div class="arc-flow">
-                <span class="arc-node">IRGC-Navy</span>
-                <span class="arc-arrow">━▶</span>
-                <span class="arc-node">Shipping</span>
-              </div>
-              <div class="arc-props">
-                <span>coercive</span>
-                <span><span class="weight">w 0.87</span> · <span class="polarity neg">−</span> · vol H</span>
-              </div>
-              <div class="arc-bar"><div class="arc-bar-fill" style="width:87%"></div></div>
-            </div>
-            <div class="arc-item">
-              <div class="arc-flow">
-                <span class="arc-node">US 5th Fleet</span>
-                <span class="arc-arrow">━▶</span>
-                <span class="arc-node">IRGC-Navy</span>
-              </div>
-              <div class="arc-props">
-                <span>deterrent</span>
-                <span><span class="weight">w 0.74</span> · <span class="polarity neg">−</span> · vol M</span>
-              </div>
-              <div class="arc-bar"><div class="arc-bar-fill" style="width:74%"></div></div>
-            </div>
-            <div class="arc-item">
-              <div class="arc-flow">
-                <span class="arc-node">GCC</span>
-                <span class="arc-arrow">━▶</span>
-                <span class="arc-node">Hormuz</span>
-              </div>
-              <div class="arc-props">
-                <span>protective</span>
-                <span><span class="weight">w 0.61</span> · <span class="polarity pos">+</span> · vol L</span>
-              </div>
-              <div class="arc-bar"><div class="arc-bar-fill" style="width:61%;background:linear-gradient(90deg,#15803d 0%,#0d7a6e 100%)"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="intel-section">
-          <div class="intel-header">
-            <span class="intel-sec-title">Recent events</span>
-            <span class="panel-action">Timeline →</span>
-          </div>
-          <div class="timeline">
-            <div class="tl-item active">
-              <div class="tl-date">2026-03-02</div>
-              <div class="tl-title">GNSS spoofing wave concludes · 340 transits affected</div>
-            </div>
-            <div class="tl-item">
-              <div class="tl-date">2026-02-04</div>
-              <div class="tl-title">GNSS spoofing wave begins in southern Gulf</div>
-            </div>
-            <div class="tl-item">
-              <div class="tl-date">2026-01-18</div>
-              <div class="tl-title">Limpet-mine incident on Liberian-flagged tanker</div>
-            </div>
-            <div class="tl-item">
-              <div class="tl-date">2025-12-22</div>
-              <div class="tl-title">IRGC drone harassment of MSC container vessel</div>
-            </div>
-            <div class="tl-item">
-              <div class="tl-date">2025-11-07</div>
-              <div class="tl-title">US carrier rotation (Eisenhower → Truman)</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </aside>
-
-  </div>
-
-  <!-- REPORT -->
-  <section class="report-panel">
-    <div class="panel-header">
-      <span class="panel-title">Report <span class="report-num">#3</span></span>
-      <div class="report-header-right">
-        <span class="panel-meta">Apr 20, 2026 · 14:02 UTC</span>
-        <button class="download-btn" title="Download report">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          <span>PDF</span>
-        </button>
-      </div>
-    </div>
-    <div class="report-scroll">
-      <article class="report">
-
-        <h1 class="report-title">A Strait Held <em>Under Tension</em>: Hormuz in the Spring of 2026</h1>
-        <p class="report-subtitle">Iranian maritime posture, Gulf shipping risk, and the structural fragility of a 21-mile chokepoint.</p>
-
-        <div class="byline">
-          <div class="byline-item"><span class="label">Dossier</span><span class="value">Iran·Hormuz</span></div>
-          <div class="byline-item"><span class="label">Nodes</span><span class="value teal">12 entities</span></div>
-          <div class="byline-item"><span class="label">Arcs</span><span class="value teal">28 relations</span></div>
-          <div class="byline-item"><span class="label">Corpus</span><span class="value">147 articles</span></div>
-          <div class="byline-item"><span class="label">Sources</span><span class="value">4 think tanks</span></div>
-        </div>
-
-        <div class="exec-summary">
-          <div class="exec-label">Executive Summary</div>
-          <div class="exec-text">The Hormuz system is currently in a <strong>high-tension stable</strong> configuration. Iranian hybrid pressure -- naval harassment, GNSS spoofing, limpet-mine incidents -- has intensified since late 2025, but <strong>GCC diplomatic hedging</strong> and US Fifth Fleet visibility have absorbed most escalatory energy. The structural weakness is insurance: any further increment in incident frequency would likely tip the London market into a risk-repricing cycle that is hard to reverse in under nine months.</div>
-        </div>
-
-        <div class="report-body">
-
-          <h2 data-num="01">The actors and what they want</h2>
-          <p>Five actors carry operational weight in the current Hormuz configuration. The <span class="chip actor">● Iran (State)</span> pursues sanctions relief as its first-order objective, but has repeatedly shown willingness to trade short-term Gulf stability for leverage. The <span class="chip actor">● IRGC-Navy</span> operates with meaningful autonomy from central command, especially in harassment operations below the threshold of open confrontation.</p>
-          <p>On the opposing side, the <span class="chip actor">● US Fifth Fleet</span> and <span class="chip actor">● UKMTO</span> maintain a posture oriented around deterrence and freedom-of-navigation reassurance rather than active interdiction. The <span class="chip actor">● GCC bloc</span> -- internally fractured between Saudi-Emirati alignment and Qatari-Omani hedging -- acts as a stabilising absorber rather than a driver of outcomes.</p>
-
-          <h2 data-num="02">The assets under pressure</h2>
-          <p>Three assets dominate the tension field: <span class="chip asset">◆ Strait of Hormuz</span> itself, the <span class="chip asset">◆ Kharg Oil Terminal</span> (through which ~90% of Iranian crude flows), and increasingly the <span class="chip asset">◆ Gulf GNSS infrastructure</span>, which has become a soft target for deniable disruption.</p>
-
-          <h3>High-weight arcs to monitor</h3>
-          <ul class="report-list">
-            <li><strong>IRGC-Navy → Commercial Shipping</strong> · coercive, weight 0.87, volatility high, polarity strongly negative. The defining arc of the current configuration.</li>
-            <li><strong>US Fifth Fleet → IRGC-Navy</strong> · deterrent, weight 0.74, volatility medium, polarity negative. Stabilising despite its confrontational signature.</li>
-            <li><strong>GCC bloc → Strait of Hormuz</strong> · protective, weight 0.61, volatility low, polarity positive. The quiet stabiliser.</li>
-          </ul>
-
-          <blockquote class="pullquote">
-            The Strait is not a front line -- it is a pressure gauge. What matters is not whether Iran closes it (they will not), but how much friction they can impose before the shipping market closes it for them.
-            <cite>ECFR · Policy Brief · March 2026</cite>
-          </blockquote>
-
-          <h2 data-num="03">Events and inflection</h2>
-          <p>Five events have shaped the current state since January. The <span class="chip event">▲ Limpet-mine incident (Jan 18)</span> reset baseline insurance premia to post-2019 levels. The <span class="chip event">▲ GNSS spoofing wave (Feb 4–Feb 27)</span> disrupted an estimated 340 transits and established a new deniable-pressure vector that did not exist eighteen months ago.</p>
-
-          <div class="data-callout">
-            <div class="data-callout-cell">
-              <div class="dc-label">Incidents Q1</div>
-              <div class="dc-value coral">23</div>
-              <div class="dc-hint">+87% vs Q4 2025</div>
-            </div>
-            <div class="data-callout-cell">
-              <div class="dc-label">War-risk premium</div>
-              <div class="dc-value">0.45%</div>
-              <div class="dc-hint">of hull value, laden</div>
-            </div>
-            <div class="data-callout-cell">
-              <div class="dc-label">Confidence</div>
-              <div class="dc-value sage">0.82</div>
-              <div class="dc-hint">Corroborated ≥3 sources</div>
-            </div>
-          </div>
-
-          <h2 data-num="04">What would shift the system</h2>
-          <p>The configuration is sensitive to three variables: (i) the war-risk premium itself, which has a reflexive relationship with incident frequency; (ii) US carrier presence, whose withdrawal would alter the deterrence arc's weight by an estimated 0.3–0.4; (iii) Chinese diplomatic engagement with Tehran, currently dormant but capable of redirecting Iranian priorities within weeks.</p>
-          <p>None of these variables is currently moving. The system is stable -- <strong>stably tense</strong>.</p>
-
-        </div>
-
-        <div class="sources">
-          <div class="sources-label">Sources cited · 4 of 147</div>
-          <div class="source-item">
-            <div class="source-num">[01]</div>
-            <div>
-              <div class="source-title">Iran's maritime strategy after the 2025 escalation cycle</div>
-              <div class="source-meta">ECFR · Ellie Geranmayeh</div>
-            </div>
-            <div class="source-date">2026-03-11</div>
-          </div>
-          <div class="source-item">
-            <div class="source-num">[02]</div>
-            <div>
-              <div class="source-title">Gulf shipping risk: a quantitative update</div>
-              <div class="source-meta">Bruegel · Simone Tagliapietra</div>
-            </div>
-            <div class="source-date">2026-03-04</div>
-          </div>
-          <div class="source-item">
-            <div class="source-num">[03]</div>
-            <div>
-              <div class="source-title">GNSS spoofing as hybrid pressure: Iranian innovation in denial</div>
-              <div class="source-meta">MERICS · Angela Stanzel</div>
-            </div>
-            <div class="source-date">2026-02-28</div>
-          </div>
-          <div class="source-item">
-            <div class="source-num">[04]</div>
-            <div>
-              <div class="source-title">The GCC hedging dilemma in a multipolar Gulf</div>
-              <div class="source-meta">ISPI · Valeria Talbot</div>
-            </div>
-            <div class="source-date">2026-02-14</div>
-          </div>
-        </div>
-
-      </article>
-    </div>
-  </section>
-
-</div>
-```
-
-  </div>
+  <div id="app-root"></div>
 </div>
 
-<script>
-  const APP_VERSION = "0.6.3";
-  console.log(`CHESS Reader ${APP_VERSION}`);
+<script src="data.js"></script>
 
-  document.querySelectorAll('.graph-ctrl').forEach(btn => {
-    btn.addEventListener('click', () => {
-      btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
-
-  const ta = document.querySelector('.chat-input-box textarea');
-  if (ta) {
-    ta.addEventListener('input', () => {
-      ta.style.height = 'auto';
-      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-    });
-  }
-</script>
+<script src="app.js"></script>
 
 </body>
 </html>
