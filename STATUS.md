@@ -122,20 +122,53 @@ Ora con `description` sul cluster e sul dossier per l'info sheet.
 
 ## 3. Prossimi step
 
-### 3.1 v0.9.0 — Chat operativa, link grafo-report, filtri
+### 3.1 Navigation rework pendente (feedback v0.8.0, 2026-04-20 sera)
 
-Scope:
+Prima di continuare con v0.9.0 va rivista la navigazione. v0.8.0 è deployata
+e la home ambient è esteticamente OK, ma il modello di navigazione non
+convince l'utente. Punti fissati nella sessione di feedback:
+
+- **Chat attiva dalla home**: l'input deve essere funzionante subito (non
+  solo dalla schermata report). Tap su "Run" invia la domanda e porta
+  l'utente alla schermata report con graph/intel/report popolati. La
+  funzionalità mock della chat (attualmente pianificata per v0.9.0) viene
+  anticipata.
+- **Atlas ambient cliccabile**: click su cluster/dossier dalla home apre
+  direttamente la schermata report del dossier corrispondente. Atlas
+  ambient cessa di essere "solo sfondo informativo" e diventa una
+  superficie di scorciatoie visuali.
+- **Via il bottone "Expand"**: l'Atlas ambient è già abbastanza grande da
+  essere navigato in place. La vista Atlas full-screen separata viene
+  eliminata (o ripensata). La route `#atlas-full` viene ritirata.
+- **Ritorno ad Atlas dalla schermata report**: nella schermata report serve
+  un bottone/affordance esplicito per tornare alla home (Atlas ambient).
+  Posizione e label da decidere — probabilmente topbar o un chip nella
+  chat.
+- **Meccanica esatta da rifinire**: LOD / zoom su Atlas ambient (serve
+  ancora? o basta una mappa statica cliccabile?), cosa succede ai dossier
+  vs cluster senza dossier al click, breadcrumb in topbar, transizione
+  visuale home → report.
+
+Conseguenze previste sui file memory: la decisione architetturale
+`CLAUDE.md` §7.4 ("Atlas mai router") va rilassata — Atlas diventa una
+scorciatoia visuale, pur restando la chat l'entrypoint primario. Aggiornare
+dopo aver chiuso il design.
+
+### 3.2 v0.9.0 — Chat operativa, link grafo-report, filtri
+
+Scope (da riallineare dopo il navigation rework di §3.1):
 
 - **Chat finto-funzionante end-to-end**: input accetta domande, genera
   risposte mock con delay simulato, produce coppie (report #N, grafo #N)
   per ogni domanda. I chip `↗ Report #N` / `↗ Graph #N` dentro i messaggi
   sono attivi e ripristinano report/grafo precedenti nell'area di lavoro.
+  (Parte di questa funzionalità potrebbe essere anticipata in §3.1.)
 - **Link chip ↔ grafo**: click su una chip nel report evidenzia il nodo
   corrispondente nel grafo.
 - **Filtri grafo attivi**: toggle Full / Actors / Assets / Events che
   applicano effettivamente il filtro al rendering SVG.
 
-### 3.2 v1.0.0 — Fullscreen, PDF, polish
+### 3.3 v1.0.0 — Fullscreen, PDF, polish
 
 Scope:
 
