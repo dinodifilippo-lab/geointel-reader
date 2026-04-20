@@ -7,14 +7,15 @@
 	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
 	<style>
 		:root {
-			--bg-dark: #0f1419;
-			--bg-panel: #1a1f2e;
-			--bg-input: #242d3d;
+			--bg-dark: #0a0e16;
+			--bg-panel: #121824;
+			--bg-input: #1a2332;
 			--text-primary: #e8eef5;
-			--text-secondary: #a8b0be;
+			--text-secondary: #8fa3b8;
 			--accent-red: #e63946;
 			--accent-gold: #f4a460;
-			--border-color: #2a3344;
+			--accent-blue: #457b9d;
+			--border-color: #1f2a3a;
 			--font-mono: 'IBM Plex Mono', monospace;
 			--font-display: 'Crimson Text', serif;
 		}
@@ -28,7 +29,7 @@
 		html, body {
 			width: 100%;
 			height: 100%;
-			background: var(--bg-dark);
+			background: linear-gradient(135deg, var(--bg-dark) 0%, #0d1119 100%);
 			color: var(--text-primary);
 			font-family: var(--font-mono);
 			font-size: 13px;
@@ -52,13 +53,13 @@
 
 		.container {
 			display: grid;
-			grid-template-columns: 1fr 380px;
+			grid-template-columns: 1fr 420px;
 			height: 100vh;
 			gap: 0;
 		}
 
 		.main {
-			background: var(--bg-dark);
+			background: linear-gradient(180deg, rgba(10,14,22,0.9) 0%, rgba(13,17,25,0.9) 100%);
 			border-right: 1px solid var(--border-color);
 			display: flex;
 			flex-direction: column;
@@ -67,20 +68,39 @@
 			position: relative;
 		}
 
+		.main::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: 
+				radial-gradient(circle at 20% 50%, rgba(230, 57, 70, 0.03) 0%, transparent 50%),
+				radial-gradient(circle at 80% 80%, rgba(69, 123, 157, 0.02) 0%, transparent 50%);
+			pointer-events: none;
+		}
+
 		.header {
 			margin-bottom: 48px;
 			border-bottom: 1px solid var(--border-color);
 			padding-bottom: 24px;
 			flex-shrink: 0;
+			position: relative;
+			z-index: 1;
 		}
 
 		.header-title {
 			font-family: var(--font-display);
-			font-size: 28px;
+			font-size: 32px;
 			font-weight: normal;
 			margin-bottom: 8px;
-			letter-spacing: -0.3px;
+			letter-spacing: -0.5px;
 			text-transform: uppercase;
+			background: linear-gradient(135deg, var(--text-primary), var(--accent-gold));
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			background-clip: text;
 		}
 
 		.header-subtitle {
@@ -96,8 +116,10 @@
 			overflow-y: auto;
 			display: flex;
 			flex-direction: column;
-			gap: 32px;
+			gap: 40px;
 			padding-bottom: 32px;
+			position: relative;
+			z-index: 1;
 		}
 
 		.empty-state {
@@ -113,7 +135,7 @@
 		.empty-icon {
 			font-size: 48px;
 			margin-bottom: 16px;
-			opacity: 0.5;
+			opacity: 0.4;
 		}
 
 		.message {
@@ -121,11 +143,11 @@
 		}
 
 		.user-message {
-			background: linear-gradient(135deg, rgba(230, 57, 70, 0.04), rgba(244, 164, 96, 0.02));
-			border: 1px solid rgba(42, 51, 68, 0.8);
-			border-left: 2px solid rgba(230, 57, 70, 0.6);
-			padding: 20px;
-			border-radius: 2px;
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.08), rgba(69, 123, 157, 0.05));
+			border: 1px solid rgba(230, 57, 70, 0.2);
+			border-left: 3px solid var(--accent-red);
+			padding: 24px;
+			border-radius: 4px;
 			margin-left: 40px;
 		}
 
@@ -138,15 +160,7 @@
 		.message-time {
 			font-size: 10px;
 			color: var(--text-secondary);
-			opacity: 0.6;
-		}
-
-		.loading-message {
-			display: flex;
-			align-items: center;
-			gap: 12px;
-			color: var(--text-secondary);
-			font-size: 12px;
+			opacity: 0.5;
 		}
 
 		.result-section {
@@ -157,26 +171,52 @@
 			font-size: 10px;
 			text-transform: uppercase;
 			letter-spacing: 2px;
-			color: var(--text-secondary);
-			margin-bottom: 20px;
+			color: var(--accent-gold);
+			margin-bottom: 24px;
 			display: block;
-			font-weight: 500;
-		}
-
-		.result-narrative {
-			background: linear-gradient(135deg, rgba(230, 57, 70, 0.04), rgba(244, 164, 96, 0.02));
-			border: 1px solid rgba(42, 51, 68, 0.8);
-			border-left: 2px solid rgba(230, 57, 70, 0.6);
-			padding: 28px;
-			margin-bottom: 40px;
-			line-height: 1.8;
-			font-size: 13px;
-			border-radius: 2px;
-		}
-
-		.result-narrative strong {
-			color: rgba(244, 164, 96, 0.9);
 			font-weight: 600;
+		}
+
+		.result-report {
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.06), rgba(69, 123, 157, 0.04));
+			border: 1px solid var(--border-color);
+			border-left: 3px solid var(--accent-blue);
+			padding: 32px;
+			margin-bottom: 48px;
+			border-radius: 4px;
+			line-height: 1.9;
+			font-size: 13px;
+		}
+
+		.result-report strong {
+			color: var(--accent-gold);
+			font-weight: 600;
+		}
+
+		.result-report em {
+			color: var(--accent-blue);
+			font-style: italic;
+		}
+
+		.result-report p {
+			margin-bottom: 16px;
+		}
+
+		.result-report ul {
+			list-style: none;
+			padding-left: 20px;
+		}
+
+		.result-report li {
+			margin-bottom: 12px;
+			position: relative;
+		}
+
+		.result-report li:before {
+			content: '→ ';
+			color: var(--accent-red);
+			position: absolute;
+			left: -20px;
 		}
 
 		.graph-section {
@@ -187,55 +227,72 @@
 			font-size: 10px;
 			text-transform: uppercase;
 			letter-spacing: 2px;
-			color: var(--text-secondary);
-			margin-bottom: 20px;
+			color: var(--accent-gold);
+			margin-bottom: 24px;
 			display: block;
-			font-weight: 500;
+			font-weight: 600;
 		}
 
 		.graph-container {
-			background: linear-gradient(135deg, rgba(18, 24, 38, 0.5), rgba(24, 32, 48, 0.3));
-			border: 1px solid rgba(42, 51, 68, 0.8);
-			border-radius: 2px;
+			background: linear-gradient(135deg, rgba(18, 28, 40, 0.8), rgba(20, 30, 45, 0.6));
+			border: 1px solid var(--border-color);
+			border-radius: 4px;
 			aspect-ratio: 2 / 1;
 			overflow: hidden;
-			margin-bottom: 16px;
+			margin-bottom: 20px;
+			position: relative;
+		}
+
+		.graph-container::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: 
+				radial-gradient(circle at 30% 40%, rgba(230, 57, 70, 0.05) 0%, transparent 50%),
+				radial-gradient(circle at 70% 60%, rgba(69, 123, 157, 0.05) 0%, transparent 50%);
+			pointer-events: none;
 		}
 
 		.graph-svg {
 			width: 100%;
 			height: 100%;
+			position: relative;
+			z-index: 1;
 		}
 
 		.edge {
-			stroke: rgba(230, 57, 70, 0.2);
-			stroke-width: 1.5;
+			stroke: rgba(230, 57, 70, 0.25);
+			stroke-width: 2;
 		}
 
 		.node {
 			cursor: pointer;
-			transition: all 0.2s ease;
+			transition: all 0.3s ease;
 		}
 
 		.node:hover {
-			filter: drop-shadow(0 0 8px rgba(230, 57, 70, 0.4));
+			filter: drop-shadow(0 0 12px rgba(230, 57, 70, 0.5));
 		}
 
 		.node:hover .node-circle {
-			fill: rgba(230, 57, 70, 0.9);
+			fill: rgba(230, 57, 70, 0.95);
+			stroke-width: 2;
 		}
 
 		.node-circle {
-			fill: rgba(230, 57, 70, 0.7);
-			stroke: rgba(230, 57, 70, 0.4);
+			fill: rgba(230, 57, 70, 0.75);
+			stroke: rgba(230, 57, 70, 0.5);
 			stroke-width: 1;
-			transition: all 0.2s ease;
+			transition: all 0.3s ease;
 		}
 
 		.node-text {
 			font-family: var(--font-mono);
 			font-size: 8px;
-			font-weight: 600;
+			font-weight: 700;
 			fill: white;
 			text-anchor: middle;
 			dominant-baseline: middle;
@@ -245,22 +302,24 @@
 		.graph-hint {
 			font-size: 11px;
 			color: var(--text-secondary);
-			margin-top: 12px;
+			margin-top: 16px;
 		}
 
 		.prompt-section {
-			margin-bottom: 48px;
+			margin-bottom: 32px;
 			flex-shrink: 0;
+			position: relative;
+			z-index: 1;
 		}
 
 		.prompt-label {
 			font-size: 10px;
 			text-transform: uppercase;
 			letter-spacing: 2px;
-			color: var(--text-secondary);
+			color: var(--accent-gold);
 			margin-bottom: 16px;
 			display: block;
-			font-weight: 500;
+			font-weight: 600;
 		}
 
 		.prompt-input-wrapper {
@@ -270,13 +329,13 @@
 		}
 
 		.prompt-input {
-			background: rgba(18, 24, 38, 0.6);
-			border: 1px solid rgba(42, 51, 68, 0.8);
+			background: linear-gradient(135deg, rgba(18, 28, 40, 0.6), rgba(20, 30, 45, 0.4));
+			border: 1px solid var(--border-color);
 			color: var(--text-primary);
 			padding: 20px;
 			font-family: var(--font-mono);
 			font-size: 13px;
-			border-radius: 2px;
+			border-radius: 4px;
 			resize: none;
 			height: 100px;
 			transition: all 0.3s ease;
@@ -285,28 +344,30 @@
 
 		.prompt-input:focus {
 			outline: none;
-			border-color: rgba(230, 57, 70, 0.4);
-			background: rgba(230, 57, 70, 0.02);
+			border-color: var(--accent-red);
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.1), rgba(20, 30, 45, 0.4));
+			box-shadow: 0 0 20px rgba(230, 57, 70, 0.1);
 		}
 
 		.prompt-input:disabled {
-			opacity: 0.6;
+			opacity: 0.5;
 			cursor: not-allowed;
 		}
 
 		.prompt-input::placeholder {
-			color: rgba(168, 176, 190, 0.5);
+			color: var(--text-secondary);
+			opacity: 0.4;
 		}
 
 		.btn-go {
-			background: linear-gradient(135deg, rgba(230, 57, 70, 0.9), rgba(230, 57, 70, 0.7));
-			border: 1px solid rgba(230, 57, 70, 0.6);
+			background: linear-gradient(135deg, var(--accent-red), rgba(230, 57, 70, 0.8));
+			border: 1px solid var(--accent-red);
 			color: white;
 			padding: 20px;
 			font-family: var(--font-mono);
-			font-weight: 600;
+			font-weight: 700;
 			font-size: 11px;
-			border-radius: 2px;
+			border-radius: 4px;
 			text-transform: uppercase;
 			letter-spacing: 1.5px;
 			transition: all 0.3s ease;
@@ -314,12 +375,13 @@
 			display: flex;
 			align-items: center;
 			justify-content: center;
+			min-height: 60px;
 		}
 
 		.btn-go:hover:not(:disabled) {
-			background: linear-gradient(135deg, rgba(230, 57, 70, 1), rgba(230, 57, 70, 0.85));
-			box-shadow: 0 8px 24px rgba(230, 57, 70, 0.25);
-			border-color: rgba(230, 57, 70, 0.8);
+			background: linear-gradient(135deg, #d62828, var(--accent-red));
+			box-shadow: 0 12px 32px rgba(230, 57, 70, 0.3);
+			transform: translateY(-2px);
 		}
 
 		.btn-go:disabled {
@@ -329,15 +391,15 @@
 
 		.hint {
 			font-size: 10px;
-			color: rgba(168, 176, 190, 0.4);
-			margin-top: 8px;
-			letter-spacing: 0.5px;
+			color: var(--text-secondary);
+			margin-top: 12px;
+			opacity: 0.5;
 		}
 
 		.spinner {
 			display: inline-block;
-			width: 12px;
-			height: 12px;
+			width: 14px;
+			height: 14px;
 			border: 2px solid rgba(255, 255, 255, 0.3);
 			border-radius: 50%;
 			border-top-color: white;
@@ -351,7 +413,7 @@
 		@keyframes fadeInUp {
 			from {
 				opacity: 0;
-				transform: translateY(12px);
+				transform: translateY(16px);
 			}
 			to {
 				opacity: 1;
@@ -360,14 +422,26 @@
 		}
 
 		.right-panel {
-			background: linear-gradient(180deg, rgba(18, 24, 38, 0.6), rgba(15, 20, 25, 0.4));
-			border-left: 1px solid rgba(42, 51, 68, 0.8);
+			background: linear-gradient(180deg, rgba(12, 18, 28, 0.95) 0%, rgba(10, 14, 22, 0.95) 100%);
+			border-left: 1px solid var(--border-color);
 			padding: 48px 32px;
 			overflow-y: auto;
 			display: flex;
 			flex-direction: column;
-			gap: 32px;
+			gap: 40px;
 			animation: slideInRight 0.4s ease forwards;
+		}
+
+		.right-panel::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: 
+				radial-gradient(circle at 100% 20%, rgba(69, 123, 157, 0.08) 0%, transparent 50%);
+			pointer-events: none;
 		}
 
 		@keyframes slideInRight {
@@ -382,8 +456,10 @@
 		}
 
 		.panel-section {
-			border-bottom: 1px solid rgba(42, 51, 68, 0.6);
-			padding-bottom: 24px;
+			border-bottom: 1px solid var(--border-color);
+			padding-bottom: 28px;
+			position: relative;
+			z-index: 1;
 		}
 
 		.panel-section:last-child {
@@ -394,26 +470,27 @@
 			font-size: 9px;
 			text-transform: uppercase;
 			letter-spacing: 2px;
-			color: rgba(168, 176, 190, 0.7);
-			margin-bottom: 16px;
+			color: var(--accent-gold);
+			margin-bottom: 18px;
 			display: block;
-			font-weight: 600;
+			font-weight: 700;
 		}
 
 		.metadata-item {
 			display: flex;
 			justify-content: space-between;
-			margin-bottom: 12px;
+			margin-bottom: 14px;
 			font-size: 12px;
 		}
 
 		.metadata-label {
-			color: rgba(168, 176, 190, 0.6);
+			color: var(--text-secondary);
+			opacity: 0.7;
 		}
 
 		.metadata-value {
-			color: rgba(244, 164, 96, 0.85);
-			font-weight: 600;
+			color: var(--accent-blue);
+			font-weight: 700;
 		}
 
 		.suggestion-list {
@@ -421,41 +498,42 @@
 		}
 
 		.suggestion-item {
-			padding: 10px 0;
-			color: rgba(168, 176, 190, 0.65);
+			padding: 12px 0;
+			color: var(--text-secondary);
 			font-size: 12px;
 			cursor: pointer;
 			border-left: 2px solid transparent;
-			padding-left: 12px;
+			padding-left: 14px;
 			transition: all 0.2s ease;
-			line-height: 1.5;
+			line-height: 1.6;
 		}
 
 		.suggestion-item:hover {
-			color: rgba(230, 57, 70, 0.85);
-			border-left-color: rgba(230, 57, 70, 0.6);
+			color: var(--accent-red);
+			border-left-color: var(--accent-red);
 		}
 
 		.btn-secondary {
-			background: rgba(36, 45, 61, 0.6);
-			border: 1px solid rgba(42, 51, 68, 0.8);
+			background: linear-gradient(135deg, rgba(30, 42, 56, 0.8), rgba(25, 35, 50, 0.6));
+			border: 1px solid var(--border-color);
 			color: var(--text-primary);
-			padding: 12px 16px;
+			padding: 14px 16px;
 			font-family: var(--font-mono);
 			font-size: 10px;
-			border-radius: 2px;
+			border-radius: 4px;
 			text-transform: uppercase;
-			letter-spacing: 1px;
+			letter-spacing: 1.2px;
 			transition: all 0.2s ease;
 			width: 100%;
 			margin-bottom: 10px;
-			font-weight: 500;
+			font-weight: 600;
+			cursor: pointer;
 		}
 
 		.btn-secondary:hover {
-			border-color: rgba(230, 57, 70, 0.4);
-			color: rgba(230, 57, 70, 0.85);
-			background: rgba(230, 57, 70, 0.05);
+			border-color: var(--accent-red);
+			color: var(--accent-red);
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.1), rgba(25, 35, 50, 0.6));
 		}
 
 		.btn-secondary:last-of-type {
@@ -498,9 +576,9 @@
 
 		<div id="rightPanel" class="right-panel hidden">
 			<div class="panel-section">
-				<label class="panel-label">Dossier Context</label>
+				<label class="panel-label">Analysis Metadata</label>
 				<div class="metadata-item">
-					<span class="metadata-label">Active:</span>
+					<span class="metadata-label">Dossier:</span>
 					<span class="metadata-value">Iran-Hormuz</span>
 				</div>
 				<div class="metadata-item">
@@ -520,7 +598,7 @@
 			<div class="panel-section">
 				<label class="panel-label">Source Coverage</label>
 				<div class="metadata-item">
-					<span class="metadata-label">Articles cited:</span>
+					<span class="metadata-label">Articles:</span>
 					<span class="metadata-value">7</span>
 				</div>
 				<div class="metadata-item">
@@ -567,7 +645,6 @@
 			const query = queryInput.value.trim();
 			if (!query || submitBtn.disabled) return;
 
-			// Add user message
 			messages.push({
 				id: Date.now(),
 				type: 'user',
@@ -581,10 +658,21 @@
 
 			renderChat();
 
-			// Simulate LLM response
 			setTimeout(() => {
 				const mockAnalysis = {
-					narrative: `<strong>Given state:</strong> Iran IRGC operationalizes advanced drone swarms targeting maritime commerce. Houthi affiliates escalate Red Sea disruptions. Saudi Arabia's petrochemical exports face sustained risk. U.S. naval presence constrained by political cost. Regional balance shifts toward Beijing-Moscow coordination.<br><br><strong>Cascade consequences (probability-weighted):</strong><br>• Strait of Hormuz throughput ↓ 12–18% (medium confidence)<br>• Global crude prices spike $15–25/bbl (high confidence)<br>• EU manufacturing input costs ↑ (direct transmission)<br>• China gains leverage over supply routes (structural advantage)<br>• NATO cohesion tested: Germany–Poland divergence on energy policy emerges<br>• UAE and Qatar signal hedging; Saudi Arabia delays downstream investment`
+					report: `<p><strong>Given State:</strong> Iran IRGC operationalizes advanced drone swarms targeting maritime commerce in the Red Sea and Gulf of Aden. Houthi affiliates escalate coordinated disruptions of commercial shipping. Saudi Arabia's petrochemical exports face sustained risk. U.S. naval presence constrained by political cost of escalation. Regional balance shifts toward Beijing-Moscow coordination on energy chokepoint control.</p>
+
+					<p><strong>Cascade Consequences (probability-weighted):</strong></p>
+					<ul>
+						<li><em>Strait of Hormuz throughput</em> ↓ 12–18% over 6 months (medium confidence). Tanker insurance premiums spike 200–300 basis points.</li>
+						<li><em>Global crude prices</em> spike $15–25/bbl within 30 days of major disruption event (high confidence). WTI breach $120/bbl triggers OPEC+ coordination failure.</li>
+						<li><em>EU manufacturing input costs</em> rise 8–12% in energy-intensive sectors (direct transmission via petrochemical feedstock inflation).</li>
+						<li><em>China gains structural leverage</em> over supply routes via alternative transport corridors (Belt & Road resilience narrative).</li>
+						<li><em>NATO cohesion tested:</em> Germany–Poland divergence on energy sanctions vs. energy security deepens. Italy signals bilateral negotiations with Iran-aligned states.</li>
+						<li><em>UAE and Qatar signal hedging;</em> Saudi Arabia delays downstream investment projects tied to U.S. security guarantees.</li>
+					</ul>
+
+					<p><strong>Critical Inflection:</strong> If Houthi attacks exceed 3 major incidents/month for 90+ days, market expectations shift to structural supply shortage (not temporary disruption). Risk of financial stability event in commodity derivatives markets.</p>`
 				};
 
 				messages.push({
@@ -596,7 +684,7 @@
 
 				submitBtn.disabled = false;
 				renderChat();
-			}, 800);
+			}, 1200);
 		}
 
 		function renderChat() {
@@ -611,8 +699,9 @@
 				} else if (msg.type === 'analysis') {
 					return `
 						<div class="result-section">
-							<div class="result-label">Analysis Result</div>
-							<div class="result-narrative">${msg.content.narrative}</div>
+							<div class="result-label">Analysis Report</div>
+							<div class="result-report">${msg.content.report}</div>
+							
 							<div class="graph-section">
 								<div class="graph-label">Causal Network (excerpt)</div>
 								<div class="graph-container">
