@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CHESS Reader</title>
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg-dark: #0f1419;
+			--bg-panel: #1a1f2e;
+			--bg-input: #242d3d;
+			--text-primary: #e8eef5;
+			--text-secondary: #a8b0be;
+			--accent-red: #e63946;
+			--accent-gold: #f4a460;
+			--border-color: #2a3344;
+			--font-mono: 'IBM Plex Mono', monospace;
+			--font-display: 'Crimson Text', serif;
+		}
+
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		html, body {
+			width: 100%;
+			height: 100%;
+			background: var(--bg-dark);
+			color: var(--text-primary);
+			font-family: var(--font-mono);
+			font-size: 13px;
+			line-height: 1.6;
+			overflow: hidden;
+		}
+
+		::-webkit-scrollbar {
+			width: 8px;
+		}
+		::-webkit-scrollbar-track {
+			background: transparent;
+		}
+		::-webkit-scrollbar-thumb {
+			background: var(--border-color);
+			border-radius: 4px;
+		}
+		::-webkit-scrollbar-thumb:hover {
+			background: var(--accent-red);
+		}
+
+		.container {
+			display: grid;
+			grid-template-columns: 1fr 380px;
+			height: 100vh;
+			gap: 0;
+		}
+
+		.main {
+			background: var(--bg-dark);
+			border-right: 1px solid var(--border-color);
+			display: flex;
+			flex-direction: column;
+			padding: 48px 56px;
+			overflow-y: auto;
+			position: relative;
+		}
+
+		.header {
+			margin-bottom: 48px;
+			border-bottom: 1px solid var(--border-color);
+			padding-bottom: 24px;
+			flex-shrink: 0;
+		}
+
+		.header-title {
+			font-family: var(--font-display);
+			font-size: 28px;
+			font-weight: normal;
+			margin-bottom: 8px;
+			letter-spacing: -0.3px;
+			text-transform: uppercase;
+		}
+
+		.header-subtitle {
+			color: var(--text-secondary);
+			font-size: 11px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			font-weight: 500;
+		}
+
+		.chat-container {
+			flex: 1;
+			overflow-y: auto;
+			display: flex;
+			flex-direction: column;
+			gap: 32px;
+			padding-bottom: 32px;
+		}
+
+		.empty-state {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			height: 200px;
+			color: var(--text-secondary);
+			text-align: center;
+		}
+
+		.empty-icon {
+			font-size: 48px;
+			margin-bottom: 16px;
+			opacity: 0.5;
+		}
+
+		.message {
+			animation: fadeInUp 0.6s ease forwards;
+		}
+
+		.user-message {
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.04), rgba(244, 164, 96, 0.02));
+			border: 1px solid rgba(42, 51, 68, 0.8);
+			border-left: 2px solid rgba(230, 57, 70, 0.6);
+			padding: 20px;
+			border-radius: 2px;
+			margin-left: 40px;
+		}
+
+		.message-content {
+			font-size: 13px;
+			line-height: 1.8;
+			margin-bottom: 8px;
+		}
+
+		.message-time {
+			font-size: 10px;
+			color: var(--text-secondary);
+			opacity: 0.6;
+		}
+
+		.loading-message {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			color: var(--text-secondary);
+			font-size: 12px;
+		}
+
+		.result-section {
+			animation: fadeInUp 0.6s ease forwards;
+		}
+
+		.result-label {
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			color: var(--text-secondary);
+			margin-bottom: 20px;
+			display: block;
+			font-weight: 500;
+		}
+
+		.result-narrative {
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.04), rgba(244, 164, 96, 0.02));
+			border: 1px solid rgba(42, 51, 68, 0.8);
+			border-left: 2px solid rgba(230, 57, 70, 0.6);
+			padding: 28px;
+			margin-bottom: 40px;
+			line-height: 1.8;
+			font-size: 13px;
+			border-radius: 2px;
+		}
+
+		.result-narrative strong {
+			color: rgba(244, 164, 96, 0.9);
+			font-weight: 600;
+		}
+
+		.graph-section {
+			margin-top: 48px;
+		}
+
+		.graph-label {
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			color: var(--text-secondary);
+			margin-bottom: 20px;
+			display: block;
+			font-weight: 500;
+		}
+
+		.graph-container {
+			background: linear-gradient(135deg, rgba(18, 24, 38, 0.5), rgba(24, 32, 48, 0.3));
+			border: 1px solid rgba(42, 51, 68, 0.8);
+			border-radius: 2px;
+			aspect-ratio: 2 / 1;
+			overflow: hidden;
+			margin-bottom: 16px;
+		}
+
+		.graph-svg {
+			width: 100%;
+			height: 100%;
+		}
+
+		.edge {
+			stroke: rgba(230, 57, 70, 0.2);
+			stroke-width: 1.5;
+		}
+
+		.node {
+			cursor: pointer;
+			transition: all 0.2s ease;
+		}
+
+		.node:hover {
+			filter: drop-shadow(0 0 8px rgba(230, 57, 70, 0.4));
+		}
+
+		.node:hover .node-circle {
+			fill: rgba(230, 57, 70, 0.9);
+		}
+
+		.node-circle {
+			fill: rgba(230, 57, 70, 0.7);
+			stroke: rgba(230, 57, 70, 0.4);
+			stroke-width: 1;
+			transition: all 0.2s ease;
+		}
+
+		.node-text {
+			font-family: var(--font-mono);
+			font-size: 8px;
+			font-weight: 600;
+			fill: white;
+			text-anchor: middle;
+			dominant-baseline: middle;
+			pointer-events: none;
+		}
+
+		.graph-hint {
+			font-size: 11px;
+			color: var(--text-secondary);
+			margin-top: 12px;
+		}
+
+		.prompt-section {
+			margin-bottom: 48px;
+			flex-shrink: 0;
+		}
+
+		.prompt-label {
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			color: var(--text-secondary);
+			margin-bottom: 16px;
+			display: block;
+			font-weight: 500;
+		}
+
+		.prompt-input-wrapper {
+			display: grid;
+			grid-template-columns: 1fr 80px;
+			gap: 16px;
+		}
+
+		.prompt-input {
+			background: rgba(18, 24, 38, 0.6);
+			border: 1px solid rgba(42, 51, 68, 0.8);
+			color: var(--text-primary);
+			padding: 20px;
+			font-family: var(--font-mono);
+			font-size: 13px;
+			border-radius: 2px;
+			resize: none;
+			height: 100px;
+			transition: all 0.3s ease;
+			line-height: 1.6;
+		}
+
+		.prompt-input:focus {
+			outline: none;
+			border-color: rgba(230, 57, 70, 0.4);
+			background: rgba(230, 57, 70, 0.02);
+		}
+
+		.prompt-input:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+
+		.prompt-input::placeholder {
+			color: rgba(168, 176, 190, 0.5);
+		}
+
+		.btn-go {
+			background: linear-gradient(135deg, rgba(230, 57, 70, 0.9), rgba(230, 57, 70, 0.7));
+			border: 1px solid rgba(230, 57, 70, 0.6);
+			color: white;
+			padding: 20px;
+			font-family: var(--font-mono);
+			font-weight: 600;
+			font-size: 11px;
+			border-radius: 2px;
+			text-transform: uppercase;
+			letter-spacing: 1.5px;
+			transition: all 0.3s ease;
+			align-self: flex-start;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.btn-go:hover:not(:disabled) {
+			background: linear-gradient(135deg, rgba(230, 57, 70, 1), rgba(230, 57, 70, 0.85));
+			box-shadow: 0 8px 24px rgba(230, 57, 70, 0.25);
+			border-color: rgba(230, 57, 70, 0.8);
+		}
+
+		.btn-go:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+
+		.hint {
+			font-size: 10px;
+			color: rgba(168, 176, 190, 0.4);
+			margin-top: 8px;
+			letter-spacing: 0.5px;
+		}
+
+		.spinner {
+			display: inline-block;
+			width: 12px;
+			height: 12px;
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			border-radius: 50%;
+			border-top-color: white;
+			animation: spin 0.6s linear infinite;
+		}
+
+		@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+
+		@keyframes fadeInUp {
+			from {
+				opacity: 0;
+				transform: translateY(12px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		.right-panel {
+			background: linear-gradient(180deg, rgba(18, 24, 38, 0.6), rgba(15, 20, 25, 0.4));
+			border-left: 1px solid rgba(42, 51, 68, 0.8);
+			padding: 48px 32px;
+			overflow-y: auto;
+			display: flex;
+			flex-direction: column;
+			gap: 32px;
+			animation: slideInRight 0.4s ease forwards;
+		}
+
+		@keyframes slideInRight {
+			from {
+				opacity: 0;
+				transform: translateX(24px);
+			}
+			to {
+				opacity: 1;
+				transform: translateX(0);
+			}
+		}
+
+		.panel-section {
+			border-bottom: 1px solid rgba(42, 51, 68, 0.6);
+			padding-bottom: 24px;
+		}
+
+		.panel-section:last-child {
+			border-bottom: none;
+		}
+
+		.panel-label {
+			font-size: 9px;
+			text-transform: uppercase;
+			letter-spacing: 2px;
+			color: rgba(168, 176, 190, 0.7);
+			margin-bottom: 16px;
+			display: block;
+			font-weight: 600;
+		}
+
+		.metadata-item {
+			display: flex;
+			justify-content: space-between;
+			margin-bottom: 12px;
+			font-size: 12px;
+		}
+
+		.metadata-label {
+			color: rgba(168, 176, 190, 0.6);
+		}
+
+		.metadata-value {
+			color: rgba(244, 164, 96, 0.85);
+			font-weight: 600;
+		}
+
+		.suggestion-list {
+			list-style: none;
+		}
+
+		.suggestion-item {
+			padding: 10px 0;
+			color: rgba(168, 176, 190, 0.65);
+			font-size: 12px;
+			cursor: pointer;
+			border-left: 2px solid transparent;
+			padding-left: 12px;
+			transition: all 0.2s ease;
+			line-height: 1.5;
+		}
+
+		.suggestion-item:hover {
+			color: rgba(230, 57, 70, 0.85);
+			border-left-color: rgba(230, 57, 70, 0.6);
+		}
+
+		.btn-secondary {
+			background: rgba(36, 45, 61, 0.6);
+			border: 1px solid rgba(42, 51, 68, 0.8);
+			color: var(--text-primary);
+			padding: 12px 16px;
+			font-family: var(--font-mono);
+			font-size: 10px;
+			border-radius: 2px;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			transition: all 0.2s ease;
+			width: 100%;
+			margin-bottom: 10px;
+			font-weight: 500;
+		}
+
+		.btn-secondary:hover {
+			border-color: rgba(230, 57, 70, 0.4);
+			color: rgba(230, 57, 70, 0.85);
+			background: rgba(230, 57, 70, 0.05);
+		}
+
+		.btn-secondary:last-of-type {
+			margin-bottom: 0;
+		}
+
+		.hidden {
+			display: none;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="main">
+			<div class="header">
+				<div class="header-title">CHESS</div>
+				<div class="header-subtitle">Causal History & Evolutionary Scenario System</div>
+			</div>
+
+			<div class="chat-container" id="chatContainer">
+				<div class="empty-state">
+					<div class="empty-icon">→</div>
+					<p>Submit a query to begin analysis</p>
+				</div>
+			</div>
+
+			<div class="prompt-section">
+				<label class="prompt-label">Formulate your question</label>
+				<div class="prompt-input-wrapper">
+					<textarea
+						id="queryInput"
+						class="prompt-input"
+						placeholder="Example: Iran weaponizes advanced drones, U.S. cannot intervene militarily. What are the cascade consequences?"
+					></textarea>
+					<button id="submitBtn" class="btn-go">GO</button>
+				</div>
+				<div class="hint">Press Ctrl+Enter or click GO</div>
+			</div>
+		</div>
+
+		<div id="rightPanel" class="right-panel hidden">
+			<div class="panel-section">
+				<label class="panel-label">Dossier Context</label>
+				<div class="metadata-item">
+					<span class="metadata-label">Active:</span>
+					<span class="metadata-value">Iran-Hormuz</span>
+				</div>
+				<div class="metadata-item">
+					<span class="metadata-label">Entities:</span>
+					<span class="metadata-value">12</span>
+				</div>
+				<div class="metadata-item">
+					<span class="metadata-label">Relations:</span>
+					<span class="metadata-value">28</span>
+				</div>
+				<div class="metadata-item">
+					<span class="metadata-label">Events:</span>
+					<span class="metadata-value">5</span>
+				</div>
+			</div>
+
+			<div class="panel-section">
+				<label class="panel-label">Source Coverage</label>
+				<div class="metadata-item">
+					<span class="metadata-label">Articles cited:</span>
+					<span class="metadata-value">7</span>
+				</div>
+				<div class="metadata-item">
+					<span class="metadata-label">Confidence:</span>
+					<span class="metadata-value">0.78</span>
+				</div>
+			</div>
+
+			<div class="panel-section">
+				<label class="panel-label">Suggested Deepens</label>
+				<ul class="suggestion-list">
+					<li class="suggestion-item">→ Taiwan semiconductor risk</li>
+					<li class="suggestion-item">→ China leverage asymmetry</li>
+					<li class="suggestion-item">→ EU industrial competitiveness</li>
+					<li class="suggestion-item">→ Russian hedging play</li>
+					<li class="suggestion-item">→ USD energy denominator</li>
+				</ul>
+			</div>
+
+			<div class="panel-section">
+				<button class="btn-secondary" onclick="newQuery()">New Query</button>
+				<button class="btn-secondary">Save Analysis</button>
+				<button class="btn-secondary">Export</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		let messages = [];
+
+		const chatContainer = document.getElementById('chatContainer');
+		const queryInput = document.getElementById('queryInput');
+		const submitBtn = document.getElementById('submitBtn');
+		const rightPanel = document.getElementById('rightPanel');
+
+		submitBtn.addEventListener('click', submitQuery);
+		queryInput.addEventListener('keydown', (e) => {
+			if (e.ctrlKey && e.key === 'Enter') {
+				submitQuery();
+			}
+		});
+
+		function submitQuery() {
+			const query = queryInput.value.trim();
+			if (!query || submitBtn.disabled) return;
+
+			// Add user message
+			messages.push({
+				id: Date.now(),
+				type: 'user',
+				content: query,
+				timestamp: new Date()
+			});
+
+			queryInput.value = '';
+			submitBtn.disabled = true;
+			rightPanel.classList.remove('hidden');
+
+			renderChat();
+
+			// Simulate LLM response
+			setTimeout(() => {
+				const mockAnalysis = {
+					narrative: `<strong>Given state:</strong> Iran IRGC operationalizes advanced drone swarms targeting maritime commerce. Houthi affiliates escalate Red Sea disruptions. Saudi Arabia's petrochemical exports face sustained risk. U.S. naval presence constrained by political cost. Regional balance shifts toward Beijing-Moscow coordination.<br><br><strong>Cascade consequences (probability-weighted):</strong><br>• Strait of Hormuz throughput ↓ 12–18% (medium confidence)<br>• Global crude prices spike $15–25/bbl (high confidence)<br>• EU manufacturing input costs ↑ (direct transmission)<br>• China gains leverage over supply routes (structural advantage)<br>• NATO cohesion tested: Germany–Poland divergence on energy policy emerges<br>• UAE and Qatar signal hedging; Saudi Arabia delays downstream investment`
+				};
+
+				messages.push({
+					id: Date.now() + 1,
+					type: 'analysis',
+					content: mockAnalysis,
+					timestamp: new Date()
+				});
+
+				submitBtn.disabled = false;
+				renderChat();
+			}, 800);
+		}
+
+		function renderChat() {
+			const content = messages.map(msg => {
+				if (msg.type === 'user') {
+					return `
+						<div class="message user-message">
+							<div class="message-content">${escapeHtml(msg.content)}</div>
+							<div class="message-time">${msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</div>
+						</div>
+					`;
+				} else if (msg.type === 'analysis') {
+					return `
+						<div class="result-section">
+							<div class="result-label">Analysis Result</div>
+							<div class="result-narrative">${msg.content.narrative}</div>
+							<div class="graph-section">
+								<div class="graph-label">Causal Network (excerpt)</div>
+								<div class="graph-container">
+									<svg viewBox="0 0 800 400" class="graph-svg">
+										<defs>
+											<radialGradient id="grad1" cx="30%" cy="40%">
+												<stop offset="0%" style="stop-color:rgba(230,57,70,0.1);stop-opacity:1" />
+												<stop offset="100%" style="stop-color:rgba(230,57,70,0.02);stop-opacity:0" />
+											</radialGradient>
+										</defs>
+										<rect width="800" height="400" fill="url(#grad1)" />
+										
+										<line x1="120" y1="140" x2="280" y2="80" class="edge" />
+										<line x1="120" y1="140" x2="280" y2="180" class="edge" />
+										<line x1="280" y1="180" x2="400" y2="180" class="edge" />
+										<line x1="400" y1="180" x2="560" y2="220" class="edge" />
+										<line x1="560" y1="220" x2="680" y2="120" class="edge" />
+										<line x1="280" y1="80" x2="320" y2="280" class="edge" />
+										<line x1="400" y1="180" x2="320" y2="280" class="edge" />
+
+										<g class="node" transform="translate(120, 140)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">Iran</text>
+										</g>
+										<g class="node" transform="translate(280, 80)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">IRGC</text>
+										</g>
+										<g class="node" transform="translate(280, 180)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">Houthi</text>
+										</g>
+										<g class="node" transform="translate(400, 180)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">Strait</text>
+										</g>
+										<g class="node" transform="translate(560, 220)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">Oil</text>
+										</g>
+										<g class="node" transform="translate(680, 120)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">EU</text>
+										</g>
+										<g class="node" transform="translate(320, 280)">
+											<circle r="18" class="node-circle" />
+											<text class="node-text">USD</text>
+										</g>
+									</svg>
+								</div>
+								<div class="graph-hint">Click nodes to explore relationships</div>
+							</div>
+						</div>
+					`;
+				}
+				return '';
+			}).join('');
+
+			if (messages.length === 0) {
+				chatContainer.innerHTML = `
+					<div class="empty-state">
+						<div class="empty-icon">→</div>
+						<p>Submit a query to begin analysis</p>
+					</div>
+				`;
+			} else {
+				chatContainer.innerHTML = content;
+			}
+
+			chatContainer.scrollTop = chatContainer.scrollHeight;
+		}
+
+		function newQuery() {
+			messages = [];
+			rightPanel.classList.add('hidden');
+			queryInput.focus();
+			renderChat();
+		}
+
+		function escapeHtml(text) {
+			const div = document.createElement('div');
+			div.textContent = text;
+			return div.innerHTML;
+		}
+	</script>
+</body>
+</html>
