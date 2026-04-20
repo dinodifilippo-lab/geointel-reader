@@ -61,14 +61,15 @@ Elementi chiave di CHESS:
 
 ## 3. Ruolo del Reader
 
-Il Reader è la webapp statica client-facing che permette a un utente
-(analista, advisor, cliente) di esplorare i dossier geopolitici costruiti da
-KB:
+Il Reader è la webapp statica client-facing dove un utente (analista, advisor,
+cliente) pone domande geopolitiche in una chat unica e persistente, e riceve
+come risposta report editoriali (AS IS / WHAT IF / Sensitivity) e la porzione
+di Knowledge Graph rilevante. Il dossier viene individuato automaticamente dal
+sistema in base alla domanda — l'utente non lo seleziona mai esplicitamente.
 
-- Navigare il Knowledge Graph.
-- Leggere report AS IS / WHAT IF / Sensitivity.
-- Vedere fonti e timeline degli eventi.
-- Interagire tramite chat conversazionale con il dossier.
+Ogni domanda (o gruppo di domande correlate) produce una coppia (report #N,
+grafo #N). Le versioni precedenti restano accessibili dentro la conversazione
+via chip `↗ Report #N` / `↗ Graph #N`, senza dover uscire dalla chat.
 
 Deve essere elegante, editoriale, leggibile su iPad e desktop.
 
@@ -80,9 +81,11 @@ Deve essere elegante, editoriale, leggibile su iPad e desktop.
 - **Hosting**: Vercel (static site, zero-config).
 - **Dev environment**: iPad (Working Copy per git, Safari per preview, Claude
   Codice per sviluppo).
-- **Struttura file**: 3 file in root — `index.html` (shell + CSS), `data.js`
-  (mock data), `app.js` (logica). Il monolite iniziale è stato splittato per
-  gestibilità: non tornare indietro.
+- **Struttura file**: 3 file di codice in root — `index.html` (shell + CSS),
+  `data.js` (mock data), `app.js` (logica). Il monolite iniziale è stato
+  splittato per gestibilità: non tornare indietro. Asset dati (TopoJSON,
+  GeoJSON, immagini) sono ammessi come file aggiuntivi: la regola vale sul
+  codice, non sui dati.
 
 ---
 
@@ -111,12 +114,23 @@ Light editorial, non dark.
 ### 5.3 Principi di layout
 
 - Estetica editoriale, densità informativa alta ma respiro tipografico curato.
-- Layout a pannelli nella vista Dossier: chat panel (340px, sinistra), graph
-  panel + intel panel nella upper-strip (360px di altezza), report panel
+- **Schermata principale (working surface)**: chat panel a sinistra (340px,
+  sempre attiva, globale, persistente), area di lavoro a destra con graph
+  panel + intel panel nella upper-strip (360px di altezza) e report panel
   full-width in basso.
-- Topbar con brand, breadcrumb contestuale (Atlas / cluster / dossier),
-  bottone "← Atlas" per tornare alla home, icon-buttons
-  (export / share / settings).
+- **Empty state**: all'apertura — o ogni volta che non c'è ancora un report
+  generato — la metà destra mostra Atlas come sfondo ambient (mappa + cluster
+  + orbital ring), non cliccabile come router. Alla prima domanda, Atlas
+  dissolve e lascia il posto a graph + intel + report generati.
+- **Atlas full**: un bottone "Expand" su Atlas ambient apre una vista Atlas a
+  schermo intero, navigabile (zoom/pan/LOD — world → region → dossier-detail).
+  Un bottone "← Back" riporta alla working surface senza perdere la chat.
+- **Atlas info sheet**: nel full Atlas, click su cluster/dossier apre un
+  pannello laterale con descrizione + bottone "Ask about this" che chiude il
+  full, torna alla working surface e pre-popola l'input della chat con una
+  domanda generica sul cluster/dossier. Nessun suggerimento di domanda.
+- **Topbar**: brand, breadcrumb contestuale, icon-buttons (export / share /
+  settings).
 - Mai usare emoji nell'UI.
 
 ---
@@ -140,22 +154,30 @@ Light editorial, non dark.
 
 ## 7. Decisioni architetturali (non rimettere in discussione)
 
-1. **Dossier = partizioni del KG, non cartelle pre-esistenti.** La struttura
-   è: KG globale → dossier tematici (partizioni configurate a priori
-   dall'admin) → risposta (subset dalla query utente).
-2. **Chat fluida, una per dossier.** Le versioni storiche di grafo e report
-   restano accessibili via chip `↗ Report #N` / `↗ Graph #N` dentro i
-   messaggi.
-3. **Mappa Atlas con LOD dinamico.** Mostra cluster aggregati a zoom out,
-   singoli dossier a zoom in.
-4. **Dossier trans-geografici su orbital ring esterno.** I dossier non
-   riconducibili a una macro-regione vivono su un anello orbitale attorno
-   alla mappa.
-5. **3 file, non 1.** Il file singolo è stato splittato in `index.html` +
-   `data.js` + `app.js`. Mai più tornare al monolite.
-6. **Vanilla, sempre.** Niente framework, niente build step.
-7. **Palette light editoriale definitiva.** Non dark, non si discute.
-8. **Fraunces obbligatorio per i titoli.**
+1. **Chat = entrypoint globale e unico.** L'utente pone qualsiasi domanda
+   geopolitica in una conversazione singola e persistente. Non esiste una
+   selezione manuale del dossier: il sistema lo individua dalla domanda.
+2. **Report e grafo = output emergenti, non contenuti pre-esistenti.** Ogni
+   domanda (o gruppo di domande correlate) produce una coppia (report #N,
+   grafo #N). Versioni precedenti accessibili via chip `↗ Report #N` /
+   `↗ Graph #N` dentro la chat, senza uscire dalla conversazione.
+3. **Dossier = partizioni del KG.** KG globale → dossier tematici
+   (partizioni configurate a priori dall'admin) → risposta (subset dalla
+   query utente). Concetto interno al sistema, non esposto come primary nav.
+4. **Atlas = sfondo ambient + vista espandibile, mai router.** All'apertura
+   Atlas riempie la metà destra della working surface per evitare l'empty
+   state. Può essere espanso a schermo intero (zoom/pan/LOD) per
+   esplorazione visuale. Nel full, click su cluster/dossier apre un info
+   sheet con bottone "Ask about this" che seeda la chat; mai un routing
+   diretto a un dossier. Dossier trans-geografici sull'orbital ring esterno.
+5. **Basemap = TopoJSON world-110m (Natural Earth).** Dati geografici reali
+   proiettati con la funzione Equal Earth esistente. Niente polilinee
+   disegnate a mano.
+6. **3 file di codice, non 1.** `index.html` + `data.js` + `app.js`. Mai più
+   tornare al monolite. Asset dati separati sono ammessi.
+7. **Vanilla, sempre.** Niente framework, niente build step.
+8. **Palette light editoriale definitiva.** Non dark, non si discute.
+9. **Fraunces obbligatorio per i titoli.**
 
 ---
 

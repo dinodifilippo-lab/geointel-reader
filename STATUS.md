@@ -95,26 +95,49 @@ Tre dossier hardcoded in `data.js`:
 
 ## 3. Prossimi step
 
-### 3.1 v0.8.0 — Zoom/pan Atlas con LOD
+### 3.1 v0.8.0 — Rework IA: chat globale, Atlas ambient, basemap reale
+
+**Rimpiazza** il piano originale "Zoom/pan Atlas con LOD" — la sessione di
+design del 2026-04-20 ha ribaltato il modello di navigazione. La chat non è
+più scoped su un dossier: è l'entrypoint globale, e il dossier emerge dalla
+domanda (vedi `CLAUDE.md` §3 e §7). Di conseguenza Atlas smette di essere la
+landing principale / selettore di dossier e diventa sfondo ambient + vista
+secondaria espandibile.
+
+Scope v0.8.0:
+
+- **Schermata principale unica (working surface)**: chat panel sinistra
+  (340px, sempre attiva), area di lavoro destra con graph/intel upper-strip
+  + report panel bottom. La route `#atlas` scompare come home; resta una
+  route `#atlas-full` per la vista espansa.
+- **Empty state = Atlas ambient**: all'apertura, prima che la chat abbia
+  prodotto un report, la metà destra mostra Atlas come sfondo (mappa +
+  cluster + orbital ring). Non cliccabile come router. Alla prima domanda
+  dissolve e lascia il posto a graph + intel + report generati.
+- **Atlas full**: bottone "Expand" su Atlas ambient apre la vista a
+  schermo intero con zoom/pan/LOD (world → region → dossier-detail, 3
+  livelli, clustering hardcoded a 2 livelli per il mock). Bottone "← Back"
+  riporta alla working surface senza perdere la chat.
+- **Atlas info sheet**: nel full, click su cluster/dossier apre un pannello
+  laterale con descrizione + bottone "Ask about this" che chiude il full,
+  torna alla working surface e pre-popola l'input della chat. Nessun
+  suggerimento di domanda pre-compilato.
+- **Basemap reale**: sostituire i 6 poligoni hand-drawn in
+  `app.js:332-355` (`getSimpleContinentsPath`) con TopoJSON world-110m
+  (Natural Earth), proiettato con la `equalEarth` / `projectToSVG` già
+  esistenti. Il TopoJSON vive come asset dati separato.
+- **Topbar & breadcrumb**: il concetto di breadcrumb "Atlas / cluster /
+  dossier" e il bottone "← Atlas" vanno ripensati. Nella working surface
+  la topbar è minimale; nel full Atlas compare il "← Back".
+
+### 3.2 v0.9.0 — Chat operativa, link grafo-report, filtri
 
 Scope:
 
-- Zoom e pan sulla mappa Atlas.
-- 3 livelli di LOD (Level of Detail):
-  - `world` — cluster aggregati, orbital ring visibile.
-  - `region` — focus su un singolo macro-cluster, dossier rappresentati come
-    marker individuali.
-  - `dossier-detail` — vista pre-ingresso al dossier con highlight e preview.
-- Breadcrumb di ritorno che rispecchia il LOD corrente.
-- Clustering pre-calcolato **hardcoded a 2 livelli** per il mockup. Il
-  clustering dinamico vero arriverà in v1.1+.
-
-### 3.2 v0.9.0 — Chat, link grafo-report, filtri
-
-Scope:
-
-- **Chat input finto-funzionante** nei dossier: accetta input dell'utente,
-  genera risposte mock con delay simulato.
+- **Chat finto-funzionante end-to-end**: input accetta domande, genera
+  risposte mock con delay simulato, produce coppie (report #N, grafo #N)
+  per ogni domanda. I chip `↗ Report #N` / `↗ Graph #N` dentro i messaggi
+  sono attivi e ripristinano report/grafo precedenti nell'area di lavoro.
 - **Link chip ↔ grafo**: click su una chip nel report evidenzia il nodo
   corrispondente nel grafo.
 - **Filtri grafo attivi**: toggle Full / Actors / Assets / Events che
@@ -135,6 +158,16 @@ Scope:
 
 ## 4. Problemi aperti / note importanti
 
+- **Design decisions del 2026-04-20 (pre-v0.8.0)**: la sessione ha
+  riscritto il modello di navigazione. Conseguenze applicate in
+  `CLAUDE.md` (§3, §5.3, §7) e in §3.1 qui sopra. Punti fissati:
+  - Chat è entrypoint globale e persistente, non scoped sul dossier.
+  - Dossier è individuato dal sistema a partire dalla domanda, mai
+    selezionato dall'utente.
+  - Atlas è sfondo ambient + vista espandibile, mai router.
+  - Basemap Atlas passa a TopoJSON world-110m reale.
+  - Il click su cluster/dossier nel full Atlas apre info sheet con
+    "Ask about this" che seeda la chat — nessun question suggestion.
 - **Dati mock**: il Reader mostra attualmente dati hardcoded in `data.js`.
   L'integrazione reale con KB (via API Supabase o export statici) non è
   ancora progettata — sarà affrontata dopo v1.0.0.
@@ -144,6 +177,4 @@ Scope:
 - **Modifiche complete**: poiché si sviluppa da iPad, ogni modifica deve
   essere completa e testata. Niente snippet o patch parziali in sospeso.
 - **Non rimettere in discussione le decisioni architetturali** già prese
-  (vedi `CLAUDE.md` §7): 3 file separati, vanilla JS, palette light, Fraunces
-  per i titoli, dossier come partizioni del KG, orbital ring per i
-  trans-geografici.
+  (vedi `CLAUDE.md` §7).
