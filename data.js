@@ -1,14 +1,19 @@
-// CHESS Reader · data.js · v0.7.0
+// CHESS Reader · data.js · v0.8.0
 // Mock data for Atlas + 3 dossiers
 
 window.CHESS_DATA = {
 
   clusters: [
-    { id: "middle-east", label: "Middle East", lat: 29.0, lon: 50.0, dossier_ids: ["iran-hormuz"] },
-    { id: "east-asia", label: "East Asia", lat: 24.0, lon: 121.0, dossier_ids: ["taiwan-strait"] },
-    { id: "sahel", label: "Sahel", lat: 15.0, lon: 0.0, dossier_ids: [] },
-    { id: "arctic", label: "Arctic", lat: 78.0, lon: 20.0, dossier_ids: [] },
-    { id: "eastern-europe", label: "Eastern Europe", lat: 49.0, lon: 32.0, dossier_ids: [] }
+    { id: "middle-east", label: "Middle East", lat: 29.0, lon: 50.0, dossier_ids: ["iran-hormuz"],
+      description: "Strutturalmente la regione più volatile del grafo: chokepoint energetici (Hormuz, Bab-el-Mandeb), attori statali con posture ambigue, e una fitta rete di archi ad alta polarità negativa che collegano Iran, Gulf states e presenza militare USA." },
+    { id: "east-asia", label: "East Asia", lat: 24.0, lon: 121.0, dossier_ids: ["taiwan-strait"],
+      description: "Cluster dominato dalla tensione Taiwan-strait: semiconduttori come asset strategico, presenza navale USA/Giappone, e un grafo ad alta confidenza ma bassa reversibilità sui principali archi militari." },
+    { id: "sahel", label: "Sahel", lat: 15.0, lon: 0.0, dossier_ids: [],
+      description: "Regione in osservazione, nessun dossier ancora partizionato. Instabilità cronica, competizione tra attori esterni (Russia, Francia, Turchia) e fragilità istituzionale." },
+    { id: "arctic", label: "Arctic", lat: 78.0, lon: 20.0, dossier_ids: [],
+      description: "In osservazione. Apertura di rotte, militarizzazione graduale e competizione per risorse sub-marine stanno ricalibrando il grafo — ma non abbiamo ancora massa critica di eventi per aprire un dossier." },
+    { id: "eastern-europe", label: "Eastern Europe", lat: 49.0, lon: 32.0, dossier_ids: [],
+      description: "In osservazione. Il conflitto Russia-Ucraina resta il nodo centrale, con ramificazioni su energia europea, architettura NATO e supply chain difensive." }
   ],
 
   trans_geographic_dossier_ids: ["ai-us-china"],
@@ -19,6 +24,9 @@ window.CHESS_DATA = {
       id: "iran-hormuz",
       title: "Iran · Hormuz",
       cluster_id: "middle-east",
+      lat: 26.5,
+      lon: 56.3,
+      description: "Lo Stretto di Hormuz come sistema: postura navale iraniana, hedging del Golfo, presenza USA Fifth Fleet, e il ruolo del mercato assicurativo londinese come moltiplicatore sistemico del rischio.",
       stats: { entities: 12, relations: 28, events: 5, corpus: 147, sources: 4, last_update: "2h ago" },
       chat: [
         { role: "user", time: "14:02", text: "What is the current state of tensions in the Hormuz Strait given Iran's posture?" },
@@ -69,6 +77,9 @@ window.CHESS_DATA = {
       id: "taiwan-strait",
       title: "Taiwan Strait",
       cluster_id: "east-asia",
+      lat: 24.0,
+      lon: 121.0,
+      description: "Taiwan come asset strategico globale (semiconduttori avanzati) e come arco ad alta asimmetria con la Cina continentale. Presenza USA e Giappone come fattori di stabilizzazione ma anche di escalation. Bassa reversibilità dei principali archi militari.",
       stats: { entities: 14, relations: 32, events: 7, corpus: 198, sources: 5, last_update: "6h ago" },
       chat: [
         { role: "user", time: "10:22", text: "Assess the current posture around Taiwan given PLA grey-zone activity." },
@@ -113,6 +124,7 @@ window.CHESS_DATA = {
     },    "ai-us-china": {
       id: "ai-us-china",
       title: "AI · US–China Tech Rivalry",
+      description: "Competizione sistemica su compute, modelli di frontiera e supply chain dei semiconduttori. Dossier trans-geografico: gli archi attraversano USA, Cina, Taiwan, Paesi Bassi (ASML) e Corea del Sud, senza ancorarsi a una singola macro-regione.",
       cluster_id: null,
       trans_geographic: true,
       stats: { entities: 18, relations: 41, events: 9, corpus: 224, sources: 6, last_update: "1d ago" },
