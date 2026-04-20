@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<!-- CHESS Reader · v0.6.1 -->
+<!-- CHESS Reader · v0.6.2 -->
 
 <html lang="en">
 <head>
@@ -75,7 +75,7 @@ display: flex;
 align-items: center;
 padding: 0 16px;
 background: #ffffff;
-border-bottom: 1.5px solid #0a0a0a;
+border-bottom: 1px solid #0a0a0a;
 z-index: 10;
 }
 
@@ -162,7 +162,7 @@ flex: 0 0 340px;
 display: flex;
 flex-direction: column;
 background: #ffffff;
-border-right: 1.5px solid #0a0a0a;
+border-right: 1px solid #0a0a0a;
 overflow: hidden;
 min-height: 0;
 }
@@ -179,9 +179,9 @@ border-bottom: var(–line);
 }
 .panel-title {
 font-family: ‘JetBrains Mono’, monospace;
-font-size: 10px;
+font-size: 12px;
 font-weight: 700;
-letter-spacing: 0.18em;
+letter-spacing: 0.16em;
 text-transform: uppercase;
 color: var(–text-1);
 }
@@ -377,7 +377,7 @@ flex-direction: column;
 flex: 0 0 360px;
 min-height: 0;
 display: flex;
-border-bottom: 1.5px solid #0a0a0a;
+border-bottom: 1px solid #0a0a0a;
 }
 
 /* Graph panel */
@@ -388,7 +388,6 @@ min-height: 0;
 display: flex;
 flex-direction: column;
 background: #ffffff;
-border-right: 1.5px solid #0a0a0a;
 overflow: hidden;
 }
 .graph-controls {
@@ -924,7 +923,7 @@ font-weight: 600;
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark">C</div>
-      <span>CHESS<em>·</em>Reader <span class="version">v0.6.1</span></span>
+      <span>CHESS<em>·</em>Reader <span class="version">v0.6.2</span></span>
     </div>
     <div class="topbar-center">
       <span class="breadcrumb-item">Workspaces</span>
@@ -1355,7 +1354,7 @@ font-weight: 600;
 </div>
 
 <script>
-  const APP_VERSION = "0.6.1";
+  const APP_VERSION = "0.6.2";
   console.log(`CHESS Reader ${APP_VERSION}`);
 
   document.querySelectorAll('.graph-ctrl').forEach(btn => {
