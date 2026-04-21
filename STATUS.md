@@ -3,19 +3,20 @@
 Stato corrente del Reader e prossimi step concordati. Questo file cambia ad
 ogni release.
 
-**Ultima versione deployata**: v0.8.2
+**Ultima versione deployata**: v0.9.0
 **Ultimo aggiornamento**: 2026-04-21
 
 ---
 
-## 1. Versione corrente — v0.8.2
+## 1. Versione corrente — v0.9.0
 
-Seconda iterazione sulla navigazione: il click sui marker non apre più
-direttamente il report (era troppo brusco), apre una **info card**
-compatta con descrizione e attori. Chat diventa **globale unificata**
-attraverso home e report con bottone "New chat" e archivio localStorage.
-Basemap passa a Natural Earth countries (border interni) per rendere
-Europa distinguibile.
+Chat operativa completa: ogni query produce uno **snapshot** (report #N,
+grafo #N) indicizzato globalmente. Chip `↗ Report #N` cliccabili
+riportano allo snapshot. **Filtri grafo** Full/Actors/Assets/Events
+finalmente attivi. **Link chip↔grafo**: click su una chip nel report
+evidenzia il nodo corrispondente. **Archivio chat** con drawer UI:
+conversazioni salvate in localStorage, ripristinabili, cancellabili
+singolarmente o in blocco.
 
 ### 1.1 Architettura file
 
@@ -32,10 +33,11 @@ Europa distinguibile.
 
 - Hash-based, due route:
   - `#` (default) — working surface home: chat + Atlas cliccabile a destra.
-  - `#report/<dossier-id>` — working surface popolata: chat + graph + intel
-    + report del dossier.
-- Alias legacy gestiti: `#atlas`, `#home`, `#atlas-full`, `#dossier/<id>`
-  → ridirette a `#` o `#report/<id>`.
+  - `#report/<N>` — working surface popolata sullo snapshot N generato
+    dalla chat. `<N>` è un indice globale numerico.
+  - `#report/<dossier-id>` — fallback/bookmark: apre il dossier statico
+    senza snapshot (usato solo se la URL è condivisa fuori sessione).
+- Alias legacy gestiti: `#atlas`, `#home`, `#atlas-full`, `#dossier/<id>`.
 
 ### 1.3 Working surface (schermata unica)
 
@@ -133,70 +135,58 @@ v0.8.3 come drawer laterale.
 
 ### 2.1 Implementato
 
-- Working surface unica con routing semplificato.
+- Working surface unica con routing `#` / `#report/<N>` / `#report/<id>`.
 - **Chat globale unificata** (`GLOBAL_CHAT`), conversazione persistente
   attraverso home e report. Greeting iniziale, append user+pending su
-  submit, risoluzione AI con chip `↗ Report #N` cliccabile.
+  submit, risoluzione AI con chip `↗ Report #N` cliccabile che naviga
+  allo snapshot indicizzato.
+- **Snapshot report/grafo per query** (`GENERATED_REPORTS[N]`): ogni
+  submit incrementa `REPORT_COUNTER` e produce uno snapshot
+  `{ dossierId, query, timestamp, reportNum }`. La route `#report/<N>`
+  risolve allo snapshot, il report panel mostra la byline "Triggered by"
+  con la query originale.
+- **Filtri grafo attivi**: Full/Actors/Assets/Events toggle filtrano il
+  rendering SVG via classificazione dei nodi (data-type in base allo
+  stroke color dei nodi: teal=actor, amber=asset, violet=event). CSS
+  regole `[data-graph-filter]` fanno sbiadire i non-matching.
+- **Link chip↔grafo**: click su una chip (`.chip.actor/.asset/.event`)
+  nel body del report evidenzia (drop-shadow + stroke-width) il nodo
+  corrispondente nel grafo via matching per label normalizzata.
+- **Archivio chat (drawer UI)**: bottone icona in chat header apre un
+  drawer a sinistra con la lista delle conversazioni archiviate
+  (`localStorage["gir_chat_archive"]`). Ogni entry ha titolo derivato
+  dalla prima user query, timestamp, contatore messaggi. Click su entry
+  ripristina `GLOBAL_CHAT` e ricostruisce gli snapshot dai chip
+  presenti. Delete singolo + "Clear all".
 - Bottone **"New"** in chat header → archivia in localStorage e resetta
   a home + greeting.
-- Atlas home cliccabile che **apre info card** (mai più naviga al
-  report): zoom-and-reveal per cluster multi-dossier, info card diretta
-  per mono-dossier e orbital, pulse sui cluster vuoti.
-- Info card overlay: descrizione, actor chips, meta (entities/arcs/
-  corpus), bottone ×.
+- Atlas home cliccabile che **apre info card** (mai naviga al report):
+  zoom-and-reveal per cluster multi-dossier, info card diretta per
+  mono-dossier e orbital, pulse sui cluster vuoti.
+- Info card overlay: descrizione, actor chips, meta.
 - Bottone "← Atlas" dalla schermata report.
-- Basemap Natural Earth 110m **countries** con border interni: Europa
-  ora distinguibile.
+- Basemap Natural Earth 110m **countries** con border interni.
 - Design system applicato: Fraunces / Inter / JetBrains Mono, palette
   light editoriale, bordi hairline.
 - Deploy Vercel zero-config funzionante.
 
 ### 2.2 Non implementato (arriva nei prossimi step)
 
-- **Archivio chat UI**: oggi solo localStorage, senza drawer. UI in v0.8.3.
-- **Dispatch "vero"**: attualmente keyword-based; v0.9.0 aggiunge un
-  embedding/RAG-like mock più credibile.
-- **Report/Graph #N multipli per dossier**: il chip report usa il dossier
-  corrispondente, ma il contenuto del report mostrato è sempre quello
-  statico del mock. v0.9.0 genera contenuti nuovi per ogni query.
-- Link chip-in-report ↔ grafo.
-- Filtri grafo (Full / Actors / Assets / Events) non attivi.
-- Grafo non apribile fullscreen.
-- Export PDF del report non presente.
-- Integrazione reale con KB non ancora progettata — tutto è mock in
+- **Contenuto report/grafo davvero nuovo per query**: oggi lo snapshot
+  aggiunge metadata (query + timestamp), ma il body del report e il
+  grafo SVG restano quelli statici del dossier mock. La generazione
+  reale arriva con l'integrazione KB.
+- **Dispatch "vero"**: ancora keyword-based; evolverà con il back-end.
+- **Grafo fullscreen overlay**: v1.0.0.
+- **Export PDF del report**: v1.0.0.
+- **Integrazione reale con KB**: non ancora progettata — tutto mock in
   `data.js`.
 
 ---
 
 ## 3. Prossimi step
 
-### 3.1 v0.8.3 — Archivio chat drawer UI
-
-Scope:
-
-- Drawer laterale (sinistra o overlay) che mostra la lista di
-  conversazioni archiviate in `localStorage["gir_chat_archive"]`.
-- Ogni entry: titolo derivato (prima query utente), data/ora, mini-preview.
-- Click su entry → ripristina la conversazione in `GLOBAL_CHAT` e naviga
-  all'ultimo report generato (se presente).
-- Bottone elimina singola entry + "clear all".
-
-### 3.2 v0.9.0 — Report/grafi multipli per dossier, link chip-grafo, filtri
-
-Scope (aggiornato dopo v0.8.1, che ha anticipato la parte "chat
-funzionante"):
-
-- **Coppie (report #N, grafo #N) generate per query**: invece di limitarsi
-  ad appendere messaggi alla chat, ogni submit produce un nuovo
-  report+grafo che sostituisce quello nell'area destra. Chip
-  `↗ Report #N` / `↗ Graph #N` nei messaggi precedenti ripristinano
-  versioni passate.
-- **Link chip ↔ grafo**: click su una chip nel report evidenzia il nodo
-  corrispondente nel grafo.
-- **Filtri grafo attivi**: toggle Full / Actors / Assets / Events che
-  applicano effettivamente il filtro al rendering SVG.
-
-### 3.3 v1.0.0 — Fullscreen, PDF, polish
+### 3.1 v1.0.0 — Fullscreen, PDF, polish
 
 Scope:
 

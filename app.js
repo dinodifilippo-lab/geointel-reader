@@ -1,6 +1,6 @@
-// CHESS Reader · app.js · v0.8.2
+// CHESS Reader · app.js · v0.9.0
 
-const APP_VERSION = "0.8.2";
+const APP_VERSION = "0.9.0";
 console.log("CHESS Reader " + APP_VERSION);
 
 // ============ BASEMAP ASSET (async) ============
@@ -39,7 +39,15 @@ function getRoute() {
   if (!h || h === "atlas" || h === "home") return { view: "home" };
   if (h === "atlas-full") return { view: "home" }; // legacy alias
   const m = h.match(/^(report|dossier)\/(.+)$/);
-  if (m && CHESS_DATA.dossiers[m[2]]) return { view: "report", dossierId: m[2] };
+  if (m) {
+    const key = m[2];
+    // Numeric key → generated snapshot index
+    if (/^\d+$/.test(key) && GENERATED_REPORTS[key]) {
+      return { view: "report", dossierId: GENERATED_REPORTS[key].dossierId, reportNum: Number(key) };
+    }
+    // Dossier id fallback
+    if (CHESS_DATA.dossiers[key]) return { view: "report", dossierId: key, reportNum: null };
+  }
   return { view: "home" };
 }
 
@@ -62,12 +70,27 @@ const GREETING_MSG = {
 let GLOBAL_CHAT = [Object.assign({}, GREETING_MSG)];
 let REPORT_COUNTER = 0; // increments on each AI response that produces a report
 
+// Generated snapshots indexed by reportNum.
+// Each: { dossierId, query, timestamp, reportNum }.
+const GENERATED_REPORTS = {};
+
+// Ephemeral UI state for populated view.
+let GRAPH_FILTER = "full"; // full | actor | asset | event
+let GRAPH_HIGHLIGHT = null; // entity name to highlight (from chip click)
+
+// Archive drawer UI state.
+let ARCHIVE_OPEN = false;
+
 function newChat() {
   saveChatToArchive();
   GLOBAL_CHAT = [Object.assign({}, GREETING_MSG)];
   REPORT_COUNTER = 0;
+  for (const k in GENERATED_REPORTS) delete GENERATED_REPORTS[k];
   ATLAS_VIEW = { level: "world", clusterId: null };
   INFO_CARD = { open: false, type: null, id: null };
+  GRAPH_FILTER = "full";
+  GRAPH_HIGHLIGHT = null;
+  ARCHIVE_OPEN = false;
   if (window.location.hash) window.location.hash = "";
   else render();
 }
@@ -98,10 +121,11 @@ function render() {
       window.location.hash = "";
       return;
     }
-    root.innerHTML = renderWorkingSurfaceHTML(d);
+    const snapshot = route.reportNum ? GENERATED_REPORTS[route.reportNum] : null;
+    root.innerHTML = renderWorkingSurfaceHTML(d, snapshot);
     wireWorkingSurface(d);
   } else {
-    root.innerHTML = renderWorkingSurfaceHTML(null);
+    root.innerHTML = renderWorkingSurfaceHTML(null, null);
     wireWorkingSurface(null);
   }
 }
@@ -125,11 +149,12 @@ function renderTopbar(route) {
 }
 
 // ============ WORKING SURFACE ============
-function renderWorkingSurfaceHTML(dossier) {
+function renderWorkingSurfaceHTML(dossier, snapshot) {
   return '<div class="working-surface">' +
+    (ARCHIVE_OPEN ? renderArchiveDrawer() : '') +
     renderChatPanel(dossier) +
     '<div class="right-area">' +
-      (dossier ? renderPopulatedRight(dossier) : renderAmbientRight()) +
+      (dossier ? renderPopulatedRight(dossier, snapshot) : renderAmbientRight()) +
     '</div>' +
   '</div>';
 }
@@ -145,6 +170,9 @@ function renderChatPanel(_dossier) {
     '<div class="panel-header">' +
       '<span class="panel-title">Chat</span>' +
       '<div class="chat-header-right">' +
+        '<button class="new-chat-btn" id="archive-btn" title="Open archive">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>' +
+        '</button>' +
         '<button class="new-chat-btn" id="new-chat-btn" title="New chat">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
           '<span>New</span>' +
@@ -259,19 +287,26 @@ function computeAmbientViewBox() {
 }
 
 // ============ POPULATED RIGHT ============
-function renderPopulatedRight(d) {
+function renderPopulatedRight(d, snapshot) {
   const r = d.reports[d.current_report_id];
+  const displayNum = snapshot ? snapshot.reportNum : d.current_report_id;
+  const displayTimestamp = snapshot ? formatSnapshotTimestamp(snapshot.timestamp) : r.timestamp;
+  const queryByline = snapshot
+    ? '<div class="snapshot-query"><span class="snapshot-query-label">Triggered by</span><span class="snapshot-query-text">"' + escapeHTML(snapshot.query) + '"</span></div>'
+    : '';
+  const filterStateAttr = ' data-graph-filter="' + GRAPH_FILTER + '"';
+  const hlAttr = GRAPH_HIGHLIGHT ? ' data-graph-highlight="' + escapeHTML(GRAPH_HIGHLIGHT) + '"' : '';
   return '<div class="upper-strip">' +
-    '<section class="graph-panel">' +
+    '<section class="graph-panel"' + filterStateAttr + hlAttr + '>' +
       '<div class="panel-header">' +
-        '<span class="panel-title">Graph <span class="report-num">#' + d.current_report_id + '</span></span>' +
+        '<span class="panel-title">Graph <span class="report-num">#' + displayNum + '</span></span>' +
         '<span class="panel-action">Expand</span>' +
       '</div>' +
       '<div class="graph-controls">' +
-        '<button class="graph-ctrl active">Full</button>' +
-        '<button class="graph-ctrl">Actors</button>' +
-        '<button class="graph-ctrl">Assets</button>' +
-        '<button class="graph-ctrl">Events</button>' +
+        '<button class="graph-ctrl' + (GRAPH_FILTER === "full" ? " active" : "") + '" data-filter="full">Full</button>' +
+        '<button class="graph-ctrl' + (GRAPH_FILTER === "actor" ? " active" : "") + '" data-filter="actor">Actors</button>' +
+        '<button class="graph-ctrl' + (GRAPH_FILTER === "asset" ? " active" : "") + '" data-filter="asset">Assets</button>' +
+        '<button class="graph-ctrl' + (GRAPH_FILTER === "event" ? " active" : "") + '" data-filter="event">Events</button>' +
       '</div>' +
       '<div class="graph-svg-wrap">' +
         '<svg class="graph-svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet">' + d.graph_svg + '</svg>' +
@@ -291,14 +326,25 @@ function renderPopulatedRight(d) {
   '</div>' +
   '<section class="report-panel">' +
     '<div class="panel-header">' +
-      '<span class="panel-title">Report <span class="report-num">#' + d.current_report_id + '</span></span>' +
+      '<span class="panel-title">Report <span class="report-num">#' + displayNum + '</span></span>' +
       '<div class="report-header-right">' +
-        '<span class="panel-meta">' + r.timestamp + '</span>' +
+        '<span class="panel-meta">' + displayTimestamp + '</span>' +
         '<button class="download-btn" title="Download report"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span>PDF</span></button>' +
       '</div>' +
     '</div>' +
-    '<div class="report-scroll">' + renderReport(d) + '</div>' +
+    '<div class="report-scroll">' + queryByline + renderReport(d) + '</div>' +
   '</section>';
+}
+
+function formatSnapshotTimestamp(iso) {
+  try {
+    const d = new Date(iso);
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear() + " · " +
+      String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + " UTC";
+  } catch (e) {
+    return iso;
+  }
 }
 
 // ============ MAP RENDERING ============
@@ -398,14 +444,26 @@ function wireCommonChrome() {
   // New chat button lives in the chat panel, present on both routes.
   const newBtn = document.getElementById("new-chat-btn");
   if (newBtn) newBtn.addEventListener("click", newChat);
-  // Report chip navigation in the chat messages.
-  document.querySelectorAll(".msg-link[data-report-dossier]").forEach(function(a) {
+  // Archive drawer toggle.
+  const archBtn = document.getElementById("archive-btn");
+  if (archBtn) archBtn.addEventListener("click", function() { ARCHIVE_OPEN = !ARCHIVE_OPEN; render(); });
+  // Report chip navigation in the chat messages — routes to snapshot number.
+  document.querySelectorAll(".msg-link[data-report-num]").forEach(function(a) {
     a.addEventListener("click", function(e) {
       e.preventDefault();
-      const id = a.getAttribute("data-report-dossier");
-      window.location.hash = "report/" + id;
+      const n = a.getAttribute("data-report-num");
+      GRAPH_FILTER = "full";
+      GRAPH_HIGHLIGHT = null;
+      window.location.hash = "report/" + n;
     });
   });
+  // Graph filter + chip highlight only relevant in the populated view.
+  wireGraphFilters();
+  wireChipToGraph();
+  applyGraphFilter();
+  applyGraphHighlight();
+  // Archive drawer entry wiring.
+  wireArchiveDrawer();
 }
 
 function wireAmbientInteractions() {
@@ -468,12 +526,204 @@ function wireAmbientInteractions() {
 }
 
 function wireGraphCtrls() {
+  // Filter wiring now lives in wireGraphFilters (wireCommonChrome calls it).
+}
+
+// ============ GRAPH FILTERS & CHIP HIGHLIGHT ============
+function classifyGraphNodes() {
+  // Tag each .graph-node with data-type based on its inner stroke colour.
+  const panel = document.querySelector(".graph-panel");
+  if (!panel) return;
+  const nodes = panel.querySelectorAll(".graph-node");
+  nodes.forEach(function(g) {
+    if (g.hasAttribute("data-type")) return;
+    let type = "other";
+    const stroked = g.querySelector('[stroke="#0d7a6e"], [stroke="#a8570f"], [stroke="#5b21b6"]');
+    if (stroked) {
+      const col = stroked.getAttribute("stroke");
+      if (col === "#0d7a6e") type = "actor";
+      else if (col === "#a8570f") type = "asset";
+      else if (col === "#5b21b6") type = "event";
+    }
+    g.setAttribute("data-type", type);
+    const label = g.querySelector("text");
+    if (label) g.setAttribute("data-label", (label.textContent || "").trim().toUpperCase());
+  });
+}
+
+function wireGraphFilters() {
   document.querySelectorAll(".graph-ctrl").forEach(function(btn) {
     btn.addEventListener("click", function() {
+      const f = btn.getAttribute("data-filter") || "full";
+      GRAPH_FILTER = f;
       btn.parentElement.querySelectorAll("button").forEach(function(b) { b.classList.remove("active"); });
       btn.classList.add("active");
+      const panel = document.querySelector(".graph-panel");
+      if (panel) panel.setAttribute("data-graph-filter", f);
+      applyGraphFilter();
     });
   });
+}
+
+function applyGraphFilter() {
+  classifyGraphNodes();
+  // CSS handles the fade via [data-graph-filter] selectors.
+}
+
+function wireChipToGraph() {
+  // Chips in the report body navigate-highlight the matching graph node.
+  document.querySelectorAll(".report-body .chip").forEach(function(chip) {
+    chip.addEventListener("click", function() {
+      const name = normaliseLabel(chip.textContent);
+      if (!name) return;
+      GRAPH_HIGHLIGHT = name;
+      const panel = document.querySelector(".graph-panel");
+      if (panel) panel.setAttribute("data-graph-highlight", name);
+      applyGraphHighlight();
+      const wrap = document.querySelector(".graph-svg-wrap");
+      if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+}
+
+function applyGraphHighlight() {
+  classifyGraphNodes();
+  const panel = document.querySelector(".graph-panel");
+  if (!panel) return;
+  const target = GRAPH_HIGHLIGHT;
+  panel.querySelectorAll(".graph-node").forEach(function(g) {
+    g.classList.remove("highlight");
+    if (!target) return;
+    const label = g.getAttribute("data-label") || "";
+    if (label && labelMatches(label, target)) {
+      g.classList.add("highlight");
+    }
+  });
+}
+
+function normaliseLabel(raw) {
+  if (!raw) return "";
+  // Strip leading bullet marks and whitespace, keep letters/digits/spaces.
+  return raw.replace(/^[●◆▲\s]+/, "").replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+function labelMatches(a, b) {
+  // a and b are already uppercase. Accept exact, prefix, or first-word match.
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const ap = a.split(" ")[0];
+  const bp = b.split(" ")[0];
+  if (ap && bp && ap === bp) return true;
+  // Try substring containment both directions.
+  return a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
+}
+
+// ============ ARCHIVE DRAWER ============
+function loadArchive() {
+  try {
+    return JSON.parse(localStorage.getItem("gir_chat_archive") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeArchive(arr) {
+  try {
+    localStorage.setItem("gir_chat_archive", JSON.stringify(arr));
+  } catch (e) {
+    console.warn("Archive write failed:", e);
+  }
+}
+
+function renderArchiveDrawer() {
+  const archive = loadArchive();
+  const items = archive.length === 0
+    ? '<div class="archive-empty">No archived conversations yet.</div>'
+    : archive.map(function(entry, idx) {
+        const firstUser = (entry.messages || []).find(function(m) { return m.role === "user"; });
+        const title = firstUser ? stripHTML(firstUser.text) : "(empty conversation)";
+        const started = new Date(entry.startedAt);
+        const dateLabel = started.toLocaleDateString() + " · " + String(started.getHours()).padStart(2,"0") + ":" + String(started.getMinutes()).padStart(2,"0");
+        const count = (entry.messages || []).length;
+        return '<div class="archive-item" data-archive-idx="' + idx + '">' +
+          '<div class="archive-item-main">' +
+            '<div class="archive-item-title">' + escapeHTML(title) + '</div>' +
+            '<div class="archive-item-meta">' + dateLabel + ' · ' + count + ' msg</div>' +
+          '</div>' +
+          '<button class="archive-delete" data-archive-idx="' + idx + '" title="Delete">×</button>' +
+        '</div>';
+      }).join("");
+  const clearAllBtn = archive.length > 0
+    ? '<button class="archive-clear-all" id="archive-clear-all">Clear all</button>'
+    : '';
+  return '<aside class="archive-drawer" role="dialog" aria-label="Archived chats">' +
+    '<div class="archive-header">' +
+      '<span class="archive-title">Archive</span>' +
+      '<button class="archive-close" id="archive-close" title="Close">×</button>' +
+    '</div>' +
+    '<div class="archive-body">' + items + '</div>' +
+    (clearAllBtn ? '<div class="archive-footer">' + clearAllBtn + '</div>' : '') +
+  '</aside>';
+}
+
+function wireArchiveDrawer() {
+  const closeBtn = document.getElementById("archive-close");
+  if (closeBtn) closeBtn.addEventListener("click", function() { ARCHIVE_OPEN = false; render(); });
+
+  const clearBtn = document.getElementById("archive-clear-all");
+  if (clearBtn) clearBtn.addEventListener("click", function() {
+    writeArchive([]);
+    render();
+  });
+
+  document.querySelectorAll(".archive-item-main").forEach(function(el) {
+    el.addEventListener("click", function() {
+      const idx = Number(el.parentElement.getAttribute("data-archive-idx"));
+      const archive = loadArchive();
+      const entry = archive[idx];
+      if (!entry) return;
+      // Save current before switching, unless the current is just the greeting.
+      saveChatToArchive();
+      GLOBAL_CHAT = (entry.messages || []).slice();
+      // Re-seed GENERATED_REPORTS from messages so chips still resolve.
+      let maxNum = 0;
+      for (let i = 0; i < GLOBAL_CHAT.length; i++) {
+        const m = GLOBAL_CHAT[i];
+        if (m && m.report_num && m.report_dossier && !GENERATED_REPORTS[m.report_num]) {
+          GENERATED_REPORTS[m.report_num] = {
+            dossierId: m.report_dossier,
+            query: "",
+            timestamp: new Date().toISOString(),
+            reportNum: m.report_num
+          };
+        }
+        if (m && m.report_num && m.report_num > maxNum) maxNum = m.report_num;
+      }
+      REPORT_COUNTER = maxNum;
+      ARCHIVE_OPEN = false;
+      // Remove the restored entry from the archive to avoid duplicates.
+      const fresh = loadArchive();
+      fresh.splice(idx, 1);
+      writeArchive(fresh);
+      if (window.location.hash) window.location.hash = "";
+      else render();
+    });
+  });
+
+  document.querySelectorAll(".archive-delete").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      const idx = Number(btn.getAttribute("data-archive-idx"));
+      const archive = loadArchive();
+      archive.splice(idx, 1);
+      writeArchive(archive);
+      render();
+    });
+  });
+}
+
+function stripHTML(s) {
+  return (s || "").replace(/<[^>]*>/g, "");
 }
 
 // ============ CHAT (mock end-to-end) ============
@@ -505,6 +755,13 @@ function handleChatSubmit(text, _currentDossier) {
   REPORT_COUNTER += 1;
   const reportNum = REPORT_COUNTER;
 
+  GENERATED_REPORTS[reportNum] = {
+    dossierId: targetId,
+    query: text,
+    timestamp: new Date().toISOString(),
+    reportNum: reportNum
+  };
+
   GLOBAL_CHAT.push({ role: "user", time: now, text: escapeHTML(text) });
   GLOBAL_CHAT.push({
     role: "ai",
@@ -515,13 +772,9 @@ function handleChatSubmit(text, _currentDossier) {
     report_num: reportNum
   });
 
-  const currentHash = window.location.hash.replace(/^#/, "");
-  const targetHash = "report/" + targetId;
-  if (currentHash === targetHash) {
-    render();
-  } else {
-    window.location.hash = targetHash;
-  }
+  GRAPH_FILTER = "full";
+  GRAPH_HIGHLIGHT = null;
+  window.location.hash = "report/" + reportNum;
 
   setTimeout(function() {
     for (let i = GLOBAL_CHAT.length - 1; i >= 0; i--) {
@@ -568,8 +821,8 @@ function renderMessage(m) {
     return '<div class="msg user"><div class="msg-bubble">' + m.text + '</div><div class="msg-time">' + m.time + '</div></div>';
   }
   let reportLink = "";
-  if (!m.pending && m.report_dossier && m.report_num) {
-    reportLink = '<a class="msg-link" data-report-dossier="' + m.report_dossier + '" href="#report/' + m.report_dossier + '">↗ Report #' + m.report_num + ' →</a>';
+  if (!m.pending && m.report_num) {
+    reportLink = '<a class="msg-link" data-report-num="' + m.report_num + '" href="#report/' + m.report_num + '">↗ Report #' + m.report_num + ' →</a>';
   } else if (m.report_id) {
     reportLink = '<a class="msg-link">↗ Report #' + m.report_id + ' →</a>';
   }
