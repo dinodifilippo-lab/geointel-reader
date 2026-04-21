@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CHESS Reader v0.8.1 -->
+<!-- CHESS Reader v0.8.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -139,10 +139,10 @@ html, body {
 #app-root { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: #ffffff; }
 
 /* === Atlas SVG — shared === */
-.atlas-svg { width: 100%; height: 100%; display: block; background: #ffffff; }
-.atlas-bg { fill: #ffffff; }
-.atlas-graticule { fill: none; stroke: #e8e4d6; stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.5; }
-.land polygon { fill: #ece7d6; stroke: #9a9484; stroke-width: 0.9; stroke-linejoin: round; paint-order: stroke fill; transition: fill 0.2s ease; }
+.atlas-svg { width: 100%; height: 100%; display: block; background: transparent; }
+.atlas-bg { fill: #f4eee0; }
+.atlas-graticule { fill: none; stroke: #d9d4c2; stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
+.land polygon { fill: #d8cfb6; stroke: #6a6358; stroke-width: 0.7; stroke-linejoin: round; stroke-linecap: round; paint-order: fill stroke; transition: fill 0.2s ease; }
 .cluster-marker { transition: transform 0.2s ease; }
 .cluster-marker.has-data { color: var(--teal); }
 .cluster-marker.empty { color: #b8b3a4; }
@@ -184,6 +184,26 @@ html, body {
 .cluster-marker.hidden { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
 .cluster-marker.shake .cluster-ring { animation: clusterRingPulse 0.4s ease; }
 @keyframes clusterRingPulse { 0%, 100% { r: 26; opacity: 0.25; } 50% { r: 34; opacity: 0.6; stroke: #b8203a; } }
+
+/* === Info card (overlay on atlas ambient map) === */
+.atlas-ambient-map { position: relative; }
+.info-card { position: absolute; top: 24px; right: 24px; width: 340px; max-height: calc(100% - 48px); padding: 22px 22px 18px; background: #ffffff; border: 1px solid #0f0f0f; border-radius: 12px; box-shadow: 0 10px 32px rgba(0,0,0,0.12); overflow-y: auto; z-index: 20; animation: infoFade 0.2s ease; }
+@keyframes infoFade { from { transform: translateY(-4px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.info-card-close { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border: 1px solid #d9d6ce; background: #ffffff; border-radius: 6px; font-size: 18px; line-height: 1; color: var(--text-2); cursor: pointer; display: grid; place-items: center; transition: all 0.15s ease; }
+.info-card-close:hover { background: var(--text-1); color: #ffffff; border-color: var(--text-1); }
+.info-card-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--teal); margin-bottom: 6px; }
+.info-card-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: 22px; letter-spacing: -0.02em; color: var(--text-1); margin-bottom: 10px; line-height: 1.2; padding-right: 28px; }
+.info-card-desc { font-family: 'Fraunces', serif; font-size: 14px; line-height: 1.5; color: var(--text-2); margin-bottom: 14px; }
+.info-card-section-label { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+.actor-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.actor-chip { display: inline-flex; align-items: center; padding: 3px 9px; background: var(--teal-bg); color: var(--teal); border: 1px solid rgba(13,122,110,0.25); border-radius: 5px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; }
+.info-card-foot { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text-3); padding-top: 10px; border-top: 1px solid #efece4; letter-spacing: 0.02em; }
+
+/* === New-chat button === */
+.chat-header-right { display: flex; align-items: center; gap: 10px; }
+.new-chat-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; background: #ffffff; border: 1px solid #c4bfb1; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-1); cursor: pointer; transition: all 0.15s ease; }
+.new-chat-btn:hover { background: var(--text-1); color: #ffffff; border-color: var(--text-1); }
+.new-chat-btn svg { color: inherit; }
 .working-surface { flex: 1 1 auto; min-height: 0; display: flex; background: #ffffff; }
 .chat-panel { flex: 0 0 340px; display: flex; flex-direction: column; background: #ffffff; border-right: var(--line-hair); overflow: hidden; min-height: 0; }
 .panel-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: #ffffff; border-bottom: var(--line-hair); }
@@ -337,7 +357,7 @@ blockquote.pullquote cite::before { content: '\2014 '; color: var(--text-4); }
 <header class="topbar">
 <a class="brand" href="#">
 <div class="brand-mark">C</div>
-<span>CHESS<em>·</em>Reader <span class="version">v0.8.1</span></span>
+<span>CHESS<em>·</em>Reader <span class="version">v0.8.2</span></span>
 </a>
 <div id="topbar-left-extra"></div>
 <div class="topbar-center" id="topbar-center"></div>
