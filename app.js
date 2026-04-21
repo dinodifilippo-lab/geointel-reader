@@ -1,9 +1,9 @@
-// CHESS Reader · app.js · v0.8.0
+// CHESS Reader · app.js · v0.8.1
 
-const APP_VERSION = "0.8.0";
+const APP_VERSION = "0.8.1";
 console.log("CHESS Reader " + APP_VERSION);
 
-// ============ BASEMAP ASSET (async load) ============
+// ============ BASEMAP ASSET (async) ============
 let WORLD_LAND = null;
 fetch("world-110m.json")
   .then(function(r) { return r.json(); })
@@ -36,24 +36,24 @@ const MAP_W = 1200, MAP_H = 600;
 // ============ ROUTING ============
 function getRoute() {
   const h = window.location.hash.replace(/^#/, "");
-  if (!h || h === "atlas") return { view: "working", dossierId: null };
-  if (h === "atlas-full") return { view: "atlas-full" };
+  if (!h || h === "atlas" || h === "home") return { view: "home" };
+  if (h === "atlas-full") return { view: "home" }; // legacy alias
   const m = h.match(/^(report|dossier)\/(.+)$/);
-  if (m) return { view: "working", dossierId: m[2] };
-  return { view: "working", dossierId: null };
+  if (m && CHESS_DATA.dossiers[m[2]]) return { view: "report", dossierId: m[2] };
+  return { view: "home" };
 }
 
-function navigateHash(h) {
-  if (window.location.hash.replace(/^#/, "") === h) render();
-  else window.location.hash = h;
-}
-
-window.addEventListener("hashchange", render);
+window.addEventListener("hashchange", function() {
+  if (getRoute().view === "home") ATLAS_VIEW = { level: "world", clusterId: null };
+  render();
+});
 window.addEventListener("DOMContentLoaded", render);
 
-// ============ ATLAS-FULL STATE (non-persistent) ============
-let ATLAS_LOD = { level: "world", clusterId: null, dossierId: null };
-let INFO_SHEET = { open: false, type: null, id: null };
+// ============ ATLAS AMBIENT STATE (ephemeral) ============
+let ATLAS_VIEW = { level: "world", clusterId: null };
+
+// ============ LOCAL CHAT APPENDS (ephemeral) ============
+const LOCAL_CHAT = {}; // dossierId -> [messages]
 
 // ============ RENDER ROOT ============
 function render() {
@@ -63,13 +63,17 @@ function render() {
 
   renderTopbar(route);
 
-  if (route.view === "atlas-full") {
-    root.innerHTML = renderAtlasFullHTML();
-    wireAtlasFull();
+  if (route.view === "report") {
+    const d = CHESS_DATA.dossiers[route.dossierId];
+    if (!d) {
+      window.location.hash = "";
+      return;
+    }
+    root.innerHTML = renderWorkingSurfaceHTML(d);
+    wireWorkingSurface(d);
   } else {
-    const dossier = route.dossierId ? CHESS_DATA.dossiers[route.dossierId] : null;
-    root.innerHTML = renderWorkingSurfaceHTML(dossier);
-    wireWorkingSurface(dossier);
+    root.innerHTML = renderWorkingSurfaceHTML(null);
+    wireWorkingSurface(null);
   }
 }
 
@@ -79,19 +83,9 @@ function renderTopbar(route) {
   const centerEl = document.getElementById("topbar-center");
   if (!leftEl || !centerEl) return;
 
-  if (route.view === "atlas-full") {
-    leftEl.innerHTML = '<a class="back-to-atlas" href="#">← Back</a>';
-    const lodLabel =
-      ATLAS_LOD.level === "world" ? "World" :
-      ATLAS_LOD.level === "region" ? regionLabel(ATLAS_LOD.clusterId) :
-      dossierLabel(ATLAS_LOD.dossierId);
-    centerEl.innerHTML =
-      '<span class="breadcrumb-item">Atlas</span>' +
-      '<span class="dot"></span>' +
-      '<span class="breadcrumb-item">' + lodLabel + '</span>';
-  } else if (route.dossierId) {
+  if (route.view === "report") {
     const d = CHESS_DATA.dossiers[route.dossierId];
-    leftEl.innerHTML = '';
+    leftEl.innerHTML = '<a class="back-to-atlas" href="#">← Atlas</a>';
     centerEl.innerHTML = d
       ? '<span class="dossier-pill">DOSSIER · ' + d.title.toUpperCase() + '</span>'
       : '';
@@ -99,16 +93,6 @@ function renderTopbar(route) {
     leftEl.innerHTML = '';
     centerEl.innerHTML = '';
   }
-}
-
-function regionLabel(clusterId) {
-  const c = CHESS_DATA.clusters.find(function(x) { return x.id === clusterId; });
-  return c ? c.label : "Region";
-}
-
-function dossierLabel(dossierId) {
-  const d = CHESS_DATA.dossiers[dossierId];
-  return d ? d.title : "Dossier";
 }
 
 // ============ WORKING SURFACE ============
@@ -122,58 +106,73 @@ function renderWorkingSurfaceHTML(dossier) {
 }
 
 function renderChatPanel(dossier) {
+  const liveMessages = dossier ? getLiveChat(dossier) : [];
+  const count = dossier ? liveMessages.length : 1;
+  const metaLabel = dossier ? (count + " msg · Session") : "Ready";
+
+  let messagesHTML;
   if (dossier) {
-    return '<aside class="chat-panel">' +
-      '<div class="panel-header">' +
-        '<span class="panel-title">Chat</span>' +
-        '<span class="panel-meta">' + dossier.chat.length + ' msg · Session</span>' +
-      '</div>' +
-      '<div class="chat-messages">' +
-        '<div class="day-sep">Today · Apr 20</div>' +
-        dossier.chat.map(renderMessage).join('') +
-      '</div>' +
-      renderChatInput(false) +
-    '</aside>';
+    messagesHTML = '<div class="day-sep">Today · ' + formatToday() + '</div>' +
+      liveMessages.map(renderMessage).join("");
+  } else {
+    messagesHTML =
+      '<div class="msg ai"><div class="msg-bubble">Hello. Ask me about any geopolitical tension in the world — I will synthesise a dossier from the Knowledge Graph, combining entity-level analysis, arcs with polarity and volatility, and an editorial report.</div><div class="msg-time">Now</div></div>';
   }
+
   return '<aside class="chat-panel">' +
     '<div class="panel-header">' +
       '<span class="panel-title">Chat</span>' +
-      '<span class="panel-meta">Ready</span>' +
+      '<span class="panel-meta">' + metaLabel + '</span>' +
     '</div>' +
-    '<div class="chat-messages empty">' +
-      '<div class="msg ai"><div class="msg-bubble">Hello. Ask me about any geopolitical tension in the world — I will synthesise a dossier from the Knowledge Graph, combining entity-level analysis, arcs with polarity and volatility, and an editorial report.</div><div class="msg-time">Now</div></div>' +
+    '<div class="chat-messages' + (dossier ? '' : ' empty') + '" id="chat-messages">' +
+      messagesHTML +
     '</div>' +
-    renderChatInput(true) +
+    '<form class="chat-input-wrap" id="chat-form">' +
+      '<div class="chat-input-box">' +
+        '<textarea id="chat-textarea" placeholder="Ask anything about the world\'s tensions…" rows="1"></textarea>' +
+        '<div class="chat-input-actions">' +
+          '<button type="submit" class="send-btn">Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
+        '</div>' +
+      '</div>' +
+    '</form>' +
   '</aside>';
 }
 
-function renderChatInput(isEmpty) {
-  const disabled = ' disabled';
-  return '<div class="chat-input-wrap">' +
-    '<div class="chat-input-box' + (isEmpty ? ' empty' : '') + '">' +
-      '<textarea placeholder="Ask anything about the world\'s tensions…"' + disabled + '></textarea>' +
-      '<div class="chat-input-actions">' +
-        '<button class="send-btn"' + disabled + '>Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="chat-hint">Chat activation in v0.9.0 · currently read-only preview</div>' +
-  '</div>';
+function getLiveChat(dossier) {
+  const appended = LOCAL_CHAT[dossier.id] || [];
+  return dossier.chat.concat(appended);
 }
 
-// ============ AMBIENT RIGHT (Atlas as background) ============
+function formatToday() {
+  const d = new Date();
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return months[d.getMonth()] + " " + d.getDate();
+}
+
+// ============ AMBIENT RIGHT (clickable Atlas) ============
 function renderAmbientRight() {
+  const regionLabel = ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId
+    ? (CHESS_DATA.clusters.find(function(x){return x.id === ATLAS_VIEW.clusterId;}) || {}).label || ""
+    : "";
+
+  const headerRight = ATLAS_VIEW.level === "region"
+    ? '<button class="ambient-back" id="ambient-back">← World</button>'
+    : '';
+
   return '<div class="atlas-ambient">' +
     '<div class="ambient-header">' +
       '<div class="ambient-head-text">' +
-        '<div class="ambient-title">Atlas</div>' +
-        '<div class="ambient-subtitle">Knowledge landscape — active dossiers by region</div>' +
+        '<div class="ambient-title">Atlas' + (regionLabel ? ' <span class="ambient-sub">· ' + regionLabel + '</span>' : '') + '</div>' +
+        '<div class="ambient-subtitle">' +
+          (ATLAS_VIEW.level === "region"
+            ? 'Tap a dossier to open, or ask directly in chat.'
+            : 'Ask in chat, or tap a region to drill in.') +
+        '</div>' +
       '</div>' +
-      '<a class="expand-btn" href="#atlas-full">Expand ' +
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>' +
-      '</a>' +
+      headerRight +
     '</div>' +
-    '<div class="atlas-ambient-map">' +
-      renderAtlasSVG({ interactive: false, viewBoxStr: "0 0 " + MAP_W + " " + MAP_H, showOrbital: true, labelScale: 1 }) +
+    '<div class="atlas-ambient-map" id="atlas-ambient-map">' +
+      renderAtlasSVG() +
     '</div>' +
     '<div class="ambient-legend">' +
       '<div class="legend-group"><span class="legend-dot" style="background:#0d7a6e"></span><span>Active dossier</span></div>' +
@@ -183,7 +182,37 @@ function renderAmbientRight() {
   '</div>';
 }
 
-// ============ POPULATED RIGHT (graph + intel + report) ============
+function renderAtlasSVG() {
+  const vb = computeAmbientViewBox();
+  const labelScale = ATLAS_VIEW.level === "region" ? 0.5 : 1;
+  const showOrbital = ATLAS_VIEW.level === "world";
+  const regionDossiers = (ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId)
+    ? renderRegionDossierMarkers(ATLAS_VIEW.clusterId, labelScale)
+    : '';
+
+  return '<svg class="atlas-svg interactive" viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet">' +
+    '<rect class="atlas-bg" x="0" y="0" width="' + MAP_W + '" height="' + MAP_H + '"/>' +
+    '<ellipse class="atlas-graticule" cx="' + (MAP_W/2) + '" cy="' + (MAP_H/2) + '" rx="' + (MAP_W * 0.46) + '" ry="' + (MAP_H * 0.58) + '"/>' +
+    '<g class="land">' + renderLand() + '</g>' +
+    '<g class="clusters">' + renderClusterMarkers(labelScale) + '</g>' +
+    '<g class="region-dossiers">' + regionDossiers + '</g>' +
+    '<g class="orbital-ring">' + (showOrbital ? renderOrbitalMarkers(labelScale) : '') + '</g>' +
+  '</svg>';
+}
+
+function computeAmbientViewBox() {
+  if (ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId) {
+    const c = CHESS_DATA.clusters.find(function(x){return x.id === ATLAS_VIEW.clusterId;});
+    if (c) {
+      const p = projectToSVG(c.lon, c.lat, MAP_W, MAP_H);
+      const w = 460, h = 290;
+      return (p.x - w/2).toFixed(1) + " " + (p.y - h/2).toFixed(1) + " " + w + " " + h;
+    }
+  }
+  return "0 0 " + MAP_W + " " + MAP_H;
+}
+
+// ============ POPULATED RIGHT ============
 function renderPopulatedRight(d) {
   const r = d.reports[d.current_report_id];
   return '<div class="upper-strip">' +
@@ -226,177 +255,13 @@ function renderPopulatedRight(d) {
   '</section>';
 }
 
-// ============ ATLAS FULL ============
-function renderAtlasFullHTML() {
-  const viewBoxStr = computeLODViewBox(ATLAS_LOD);
-  const labelScale = computeLabelScale(ATLAS_LOD);
-  return '<div class="atlas-full">' +
-    '<div class="atlas-full-main' + (INFO_SHEET.open ? ' with-sheet' : '') + '">' +
-      '<div class="atlas-full-map">' +
-        renderAtlasSVG({ interactive: true, viewBoxStr: viewBoxStr, showOrbital: ATLAS_LOD.level === "world", labelScale: labelScale }) +
-      '</div>' +
-      '<div class="atlas-full-lod">' +
-        '<button class="lod-btn' + (ATLAS_LOD.level === "world" ? " active" : "") + '" data-lod="world">World</button>' +
-        '<button class="lod-btn' + (ATLAS_LOD.level === "region" ? " active" : "") + '" data-lod="region"' + (ATLAS_LOD.clusterId ? "" : " disabled") + '>Region</button>' +
-        '<button class="lod-btn' + (ATLAS_LOD.level === "dossier-detail" ? " active" : "") + '" data-lod="dossier-detail"' + (ATLAS_LOD.dossierId ? "" : " disabled") + '>Dossier</button>' +
-      '</div>' +
-    '</div>' +
-    (INFO_SHEET.open ? renderInfoSheet() : '') +
-  '</div>';
-}
-
-function computeLODViewBox(lod) {
-  if (lod.level === "world" || !lod.clusterId && !lod.dossierId) {
-    return "0 0 " + MAP_W + " " + MAP_H;
-  }
-  if (lod.level === "region" && lod.clusterId) {
-    const c = CHESS_DATA.clusters.find(function(x) { return x.id === lod.clusterId; });
-    if (!c) return "0 0 " + MAP_W + " " + MAP_H;
-    const p = projectToSVG(c.lon, c.lat, MAP_W, MAP_H);
-    const w = 420, h = 260;
-    return (p.x - w/2).toFixed(1) + " " + (p.y - h/2).toFixed(1) + " " + w + " " + h;
-  }
-  if (lod.level === "dossier-detail" && lod.dossierId) {
-    const d = CHESS_DATA.dossiers[lod.dossierId];
-    if (!d) return "0 0 " + MAP_W + " " + MAP_H;
-    const lon = d.lon != null ? d.lon : 0;
-    const lat = d.lat != null ? d.lat : 0;
-    const p = projectToSVG(lon, lat, MAP_W, MAP_H);
-    const w = 240, h = 150;
-    return (p.x - w/2).toFixed(1) + " " + (p.y - h/2).toFixed(1) + " " + w + " " + h;
-  }
-  return "0 0 " + MAP_W + " " + MAP_H;
-}
-
-function computeLabelScale(lod) {
-  if (lod.level === "region") return 0.45;
-  if (lod.level === "dossier-detail") return 0.28;
-  return 1;
-}
-
-function renderInfoSheet() {
-  if (INFO_SHEET.type === "cluster") {
-    const c = CHESS_DATA.clusters.find(function(x) { return x.id === INFO_SHEET.id; });
-    if (!c) return '';
-    const hasDossiers = c.dossier_ids.length > 0;
-    const firstDossierId = hasDossiers ? c.dossier_ids[0] : null;
-    return '<aside class="info-sheet">' +
-      '<button class="info-close" data-action="close" title="Close">×</button>' +
-      '<div class="info-eyebrow">Cluster</div>' +
-      '<h2 class="info-title">' + c.label + '</h2>' +
-      '<p class="info-desc">' + c.description + '</p>' +
-      '<div class="info-meta-grid">' +
-        '<div><span class="info-meta-label">Dossiers attivi</span><span class="info-meta-value">' + c.dossier_ids.length + '</span></div>' +
-        '<div><span class="info-meta-label">Lat · Lon</span><span class="info-meta-value mono">' + c.lat.toFixed(1) + ' · ' + c.lon.toFixed(1) + '</span></div>' +
-      '</div>' +
-      (hasDossiers
-        ? '<button class="ask-btn" data-action="ask" data-dossier-id="' + firstDossierId + '">Ask about this →</button>'
-        : '<div class="info-empty-note">No active dossiers yet. Observing.</div>') +
-    '</aside>';
-  }
-  if (INFO_SHEET.type === "dossier") {
-    const d = CHESS_DATA.dossiers[INFO_SHEET.id];
-    if (!d) return '';
-    return '<aside class="info-sheet">' +
-      '<button class="info-close" data-action="close" title="Close">×</button>' +
-      '<div class="info-eyebrow">Dossier</div>' +
-      '<h2 class="info-title">' + d.title + '</h2>' +
-      '<p class="info-desc">' + d.description + '</p>' +
-      '<div class="info-meta-grid three">' +
-        '<div><span class="info-meta-label">Entities</span><span class="info-meta-value">' + d.stats.entities + '</span></div>' +
-        '<div><span class="info-meta-label">Arcs</span><span class="info-meta-value">' + d.stats.relations + '</span></div>' +
-        '<div><span class="info-meta-label">Corpus</span><span class="info-meta-value">' + d.stats.corpus + '</span></div>' +
-      '</div>' +
-      '<button class="ask-btn" data-action="ask" data-dossier-id="' + d.id + '">Ask about this →</button>' +
-    '</aside>';
-  }
-  return '';
-}
-
-function wireAtlasFull() {
-  document.querySelectorAll(".cluster-marker.has-data, .cluster-marker.empty").forEach(function(el) {
-    el.addEventListener("click", function(e) {
-      e.stopPropagation();
-      const id = el.getAttribute("data-cluster-id");
-      ATLAS_LOD = { level: "region", clusterId: id, dossierId: null };
-      INFO_SHEET = { open: true, type: "cluster", id: id };
-      render();
-    });
-  });
-  document.querySelectorAll(".orbital-item, .dossier-marker").forEach(function(el) {
-    el.addEventListener("click", function(e) {
-      e.stopPropagation();
-      const id = el.getAttribute("data-dossier-id");
-      const d = CHESS_DATA.dossiers[id];
-      ATLAS_LOD = { level: "dossier-detail", clusterId: d && d.cluster_id ? d.cluster_id : ATLAS_LOD.clusterId, dossierId: id };
-      INFO_SHEET = { open: true, type: "dossier", id: id };
-      render();
-    });
-  });
-  document.querySelectorAll(".lod-btn").forEach(function(btn) {
-    if (btn.hasAttribute("disabled")) return;
-    btn.addEventListener("click", function() {
-      const level = btn.getAttribute("data-lod");
-      ATLAS_LOD = {
-        level: level,
-        clusterId: ATLAS_LOD.clusterId,
-        dossierId: ATLAS_LOD.dossierId
-      };
-      if (level === "world") {
-        ATLAS_LOD.clusterId = null;
-        ATLAS_LOD.dossierId = null;
-      }
-      render();
-    });
-  });
-  document.querySelectorAll(".info-close").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      INFO_SHEET = { open: false, type: null, id: null };
-      ATLAS_LOD = { level: "world", clusterId: null, dossierId: null };
-      render();
-    });
-  });
-  document.querySelectorAll(".ask-btn").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      const id = btn.getAttribute("data-dossier-id");
-      INFO_SHEET = { open: false, type: null, id: null };
-      ATLAS_LOD = { level: "world", clusterId: null, dossierId: null };
-      window.location.hash = "report/" + id;
-    });
-  });
-}
-
-// ============ ATLAS SVG (shared ambient + full) ============
-function renderAtlasSVG(opts) {
-  const interactive = !!opts.interactive;
-  const viewBoxStr = opts.viewBoxStr;
-  const showOrbital = opts.showOrbital !== false;
-  const labelScale = opts.labelScale || 1;
-
-  const landHTML = renderLand();
-  const clustersHTML = renderClusterMarkers(interactive, labelScale);
-  const orbitalHTML = showOrbital ? renderOrbitalMarkers(interactive, labelScale) : '';
-  const regionDossiersHTML = (interactive && ATLAS_LOD.level === "region" && ATLAS_LOD.clusterId)
-    ? renderRegionDossierMarkers(ATLAS_LOD.clusterId, labelScale)
-    : '';
-
-  return '<svg class="atlas-svg' + (interactive ? ' interactive' : '') + '" viewBox="' + viewBoxStr + '" preserveAspectRatio="xMidYMid meet">' +
-    '<rect class="atlas-bg" x="0" y="0" width="' + MAP_W + '" height="' + MAP_H + '"/>' +
-    '<ellipse class="atlas-graticule" cx="' + (MAP_W/2) + '" cy="' + (MAP_H/2) + '" rx="' + (MAP_W * 0.46) + '" ry="' + (MAP_H * 0.58) + '"/>' +
-    '<g class="land">' + landHTML + '</g>' +
-    '<g class="clusters">' + clustersHTML + '</g>' +
-    '<g class="region-dossiers">' + regionDossiersHTML + '</g>' +
-    '<g class="orbital-ring">' + orbitalHTML + '</g>' +
-  '</svg>';
-}
-
+// ============ MAP RENDERING ============
 function renderLand() {
   if (!WORLD_LAND) return '';
   const parts = [];
   for (let i = 0; i < WORLD_LAND.length; i++) {
     const ring = WORLD_LAND[i];
     if (!ring || ring.length < 3) continue;
-    // Skip polygons that cross the antimeridian (simple heuristic: longitude range > 180).
     let minLon = 180, maxLon = -180;
     for (let j = 0; j < ring.length; j++) {
       const lon = ring[j][0];
@@ -414,7 +279,7 @@ function renderLand() {
   return parts.join("");
 }
 
-function renderClusterMarkers(interactive, labelScale) {
+function renderClusterMarkers(labelScale) {
   return CHESS_DATA.clusters.map(function(c) {
     const p = projectToSVG(c.lon, c.lat, MAP_W, MAP_H);
     const dossiers = c.dossier_ids.map(function(id) { return CHESS_DATA.dossiers[id]; }).filter(Boolean);
@@ -426,7 +291,8 @@ function renderClusterMarkers(interactive, labelScale) {
     const labelSize = (14 * labelScale).toFixed(1);
     const ringR = hasData ? 36 : 26;
     const dotR = hasData ? 14 : 9;
-    return '<g class="cluster-marker ' + (hasData ? "has-data" : "empty") + (interactive ? " interactive" : "") + '"' +
+    const isHidden = ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId !== c.id;
+    return '<g class="cluster-marker ' + (hasData ? "has-data" : "empty") + ' interactive' + (isHidden ? ' hidden' : '') + '"' +
       ' data-cluster-id="' + c.id + '"' +
       ' transform="translate(' + p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ')">' +
       '<circle class="cluster-ring" r="' + ringR + '" fill="none" stroke="currentColor" stroke-width="1" opacity="0.25"/>' +
@@ -447,14 +313,14 @@ function renderRegionDossierMarkers(clusterId, labelScale) {
     const labelSize = (12 * labelScale).toFixed(1);
     return '<g class="dossier-marker" data-dossier-id="' + d.id + '"' +
       ' transform="translate(' + p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ')">' +
-      '<circle class="dossier-halo" r="10" opacity="0.35"/>' +
-      '<circle class="dossier-dot" r="5"/>' +
-      '<text class="dossier-label" y="-10" text-anchor="middle" style="font-size:' + labelSize + 'px">' + d.title + '</text>' +
+      '<circle class="dossier-halo" r="14" opacity="0.3"/>' +
+      '<circle class="dossier-dot" r="6"/>' +
+      '<text class="dossier-label" y="-14" text-anchor="middle" style="font-size:' + labelSize + 'px">' + d.title + '</text>' +
     '</g>';
   }).join("");
 }
 
-function renderOrbitalMarkers(interactive, labelScale) {
+function renderOrbitalMarkers(labelScale) {
   const transIds = CHESS_DATA.trans_geographic_dossier_ids;
   const labelSize = (13 * labelScale).toFixed(1);
   return transIds.map(function(id, i) {
@@ -463,8 +329,7 @@ function renderOrbitalMarkers(interactive, labelScale) {
     const angle = -Math.PI / 2 + (i - (transIds.length - 1) / 2) * 0.4;
     const cx = MAP_W / 2 + Math.cos(angle) * (MAP_W * 0.42);
     const cy = MAP_H / 2 + Math.sin(angle) * (MAP_H * 0.55);
-    return '<g class="orbital-item' + (interactive ? " interactive" : "") + '"' +
-      ' data-dossier-id="' + d.id + '"' +
+    return '<g class="orbital-item interactive" data-dossier-id="' + d.id + '"' +
       ' transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
       '<circle r="22" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3" stroke-dasharray="2,3"/>' +
       '<circle class="orbital-dot" r="10"/>' +
@@ -475,7 +340,65 @@ function renderOrbitalMarkers(interactive, labelScale) {
 
 // ============ WIRE WORKING SURFACE ============
 function wireWorkingSurface(dossier) {
-  if (!dossier) return;
+  wireChatForm(dossier);
+  wireGraphCtrls();
+
+  if (!dossier) {
+    wireAmbientInteractions();
+  }
+}
+
+function wireAmbientInteractions() {
+  // Cluster clicks: world → region (if >1 dossier) or direct to report (if exactly 1).
+  // In region view, re-clicking a cluster does nothing.
+  document.querySelectorAll(".cluster-marker").forEach(function(el) {
+    el.addEventListener("click", function(e) {
+      e.stopPropagation();
+      const id = el.getAttribute("data-cluster-id");
+      const c = CHESS_DATA.clusters.find(function(x){return x.id === id;});
+      if (!c) return;
+      if (c.dossier_ids.length === 0) {
+        // empty cluster — brief shake
+        el.classList.add("shake");
+        setTimeout(function(){ el.classList.remove("shake"); }, 400);
+        return;
+      }
+      if (c.dossier_ids.length === 1) {
+        window.location.hash = "report/" + c.dossier_ids[0];
+        return;
+      }
+      // multiple dossiers → zoom & reveal
+      ATLAS_VIEW = { level: "region", clusterId: id };
+      render();
+    });
+  });
+  // Dossier markers (region view)
+  document.querySelectorAll(".dossier-marker").forEach(function(el) {
+    el.addEventListener("click", function(e) {
+      e.stopPropagation();
+      const id = el.getAttribute("data-dossier-id");
+      window.location.hash = "report/" + id;
+    });
+  });
+  // Orbital items → direct to report
+  document.querySelectorAll(".orbital-item").forEach(function(el) {
+    el.addEventListener("click", function(e) {
+      e.stopPropagation();
+      const id = el.getAttribute("data-dossier-id");
+      window.location.hash = "report/" + id;
+    });
+  });
+  // Back to world
+  const backBtn = document.getElementById("ambient-back");
+  if (backBtn) {
+    backBtn.addEventListener("click", function() {
+      ATLAS_VIEW = { level: "world", clusterId: null };
+      render();
+    });
+  }
+}
+
+function wireGraphCtrls() {
   document.querySelectorAll(".graph-ctrl").forEach(function(btn) {
     btn.addEventListener("click", function() {
       btn.parentElement.querySelectorAll("button").forEach(function(b) { b.classList.remove("active"); });
@@ -484,7 +407,97 @@ function wireWorkingSurface(dossier) {
   });
 }
 
-// ============ MESSAGE / INTEL / REPORT (reused from v0.7) ============
+// ============ CHAT (mock end-to-end) ============
+function wireChatForm(dossier) {
+  const form = document.getElementById("chat-form");
+  const ta = document.getElementById("chat-textarea");
+  if (!form || !ta) return;
+  ta.addEventListener("input", function() {
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+  });
+  ta.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    const text = ta.value.trim();
+    if (!text) return;
+    handleChatSubmit(text, dossier);
+  });
+}
+
+function handleChatSubmit(text, currentDossier) {
+  const targetId = dispatchQuery(text);
+  const now = formatNow();
+
+  if (currentDossier && currentDossier.id === targetId) {
+    // Stay on the same dossier: append user + pending AI, then resolve AI after delay.
+    appendLocalMessage(targetId, { role: "user", time: now, text: escapeHTML(text) });
+    appendLocalMessage(targetId, { role: "ai", time: now, text: "Synthesising from the subgraph", pending: true });
+    render();
+    setTimeout(function() {
+      // Replace the pending with a resolved AI message.
+      const arr = LOCAL_CHAT[targetId] || [];
+      const last = arr[arr.length - 1];
+      if (last && last.pending) {
+        last.pending = false;
+        last.text = mockAIResponse(text, CHESS_DATA.dossiers[targetId]);
+        last.time = formatNow();
+      }
+      render();
+    }, 900);
+  } else {
+    // Switch to target dossier: seed its local chat with the user query + pending AI.
+    appendLocalMessage(targetId, { role: "user", time: now, text: escapeHTML(text) });
+    appendLocalMessage(targetId, { role: "ai", time: now, text: "Synthesising from the subgraph", pending: true });
+    window.location.hash = "report/" + targetId;
+    setTimeout(function() {
+      const arr = LOCAL_CHAT[targetId] || [];
+      const last = arr[arr.length - 1];
+      if (last && last.pending) {
+        last.pending = false;
+        last.text = mockAIResponse(text, CHESS_DATA.dossiers[targetId]);
+        last.time = formatNow();
+      }
+      render();
+    }, 900);
+  }
+}
+
+function appendLocalMessage(dossierId, msg) {
+  if (!LOCAL_CHAT[dossierId]) LOCAL_CHAT[dossierId] = [];
+  LOCAL_CHAT[dossierId].push(msg);
+}
+
+function dispatchQuery(text) {
+  const t = text.toLowerCase();
+  if (/\b(hormuz|iran|gulf|persian|gcc|strait of hormuz)\b/.test(t)) return "iran-hormuz";
+  if (/\b(taiwan|china\s+sea|tsmc|south\s+china|formosa|pla)\b/.test(t)) return "taiwan-strait";
+  if (/\b(ai|a\.i\.|semiconductor|chip|lithography|asml|nvidia|tech\s+rivalry)\b/.test(t)) return "ai-us-china";
+  return "iran-hormuz";
+}
+
+function mockAIResponse(query, dossier) {
+  if (!dossier) return "Response generated.";
+  return "Drawing on <strong>" + dossier.stats.entities + " entities</strong> and <strong>" + dossier.stats.relations + " relations</strong> in the " + dossier.title + " subgraph, here is a preliminary synthesis. Expand the report on the right for the full editorial.";
+}
+
+function formatNow() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return hh + ":" + mm;
+}
+
+function escapeHTML(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ============ MESSAGE / INTEL / REPORT ============
 function renderMessage(m) {
   if (m.role === "user") {
     return '<div class="msg user"><div class="msg-bubble">' + m.text + '</div><div class="msg-time">' + m.time + '</div></div>';
