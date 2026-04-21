@@ -10,7 +10,7 @@ const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functio
 // TODO(user): paste your Supabase anon key here before deploying.
 // This is the public "anon" key from Supabase Project Settings -> API -> anon/public.
 // It is safe to include in the frontend.
-const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_HERE";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNodXZmZGJwd2lzemp1b3lodmx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTU2NzcsImV4cCI6MjA4OTk3MTY3N30.7OAuk36xTNa6cFyF2cnpBRUtgeZpttAyi-ZA28_fhdU";
 
 // Ephemeral chat state for live backend.
 let CHAT_IN_FLIGHT = false;
