@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CHESS Reader v1.0.0 -->
+<!-- GeoIntel Reader v1.1.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -243,6 +243,13 @@ html, body {
 .chat-input-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
 .send-btn { padding: 6px 14px; background: var(--teal); color: #ffffff; border: none; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s ease; }
 .send-btn:hover { transform: translateY(-1px); background: #0a6158; }
+.send-btn[disabled], .send-btn:disabled { background: #9e9b94; cursor: not-allowed; transform: none; opacity: 0.7; }
+.chat-input-box textarea[disabled], .chat-input-box textarea:disabled { color: var(--text-3); cursor: not-allowed; }
+.chat-loading { display: flex; align-items: center; justify-content: center; padding: 8px 10px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: var(--text-3); background: var(--bg-well); border: 1px solid #d9d6ce; border-radius: 8px; }
+.chat-error { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 12px; line-height: 1.4; color: var(--coral); background: #fdecef; border: 1px solid rgba(184,32,58,0.35); border-radius: 8px; }
+.chat-error .chat-error-text { flex: 1 1 auto; min-width: 0; }
+.chat-error-dismiss { flex: 0 0 auto; width: 20px; height: 20px; border: none; background: transparent; color: var(--coral); font-size: 16px; line-height: 1; cursor: pointer; border-radius: 4px; display: grid; place-items: center; transition: background 0.15s ease; }
+.chat-error-dismiss:hover { background: rgba(184,32,58,0.15); }
 .right-area { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .upper-strip { flex: 0 0 360px; min-height: 0; display: flex; border-bottom: var(--line-hair); }
 .graph-panel { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #ffffff; overflow: hidden; }

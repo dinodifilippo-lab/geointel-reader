@@ -82,10 +82,21 @@ Deve essere elegante, editoriale, leggibile su iPad e desktop.
 - **Dev environment**: iPad (Working Copy per git, Safari per preview, Claude
   Codice per sviluppo).
 - **Struttura file**: 3 file di codice in root — `index.html` (shell + CSS),
-  `data.js` (mock data), `app.js` (logica). Il monolite iniziale è stato
-  splittato per gestibilità: non tornare indietro. Asset dati (TopoJSON,
-  GeoJSON, immagini) sono ammessi come file aggiuntivi: la regola vale sul
-  codice, non sui dati.
+  `data.js` (dossier + brief per LLM context), `app.js` (logica). Il monolite
+  iniziale è stato splittato per gestibilità: non tornare indietro. Asset
+  dati (TopoJSON, GeoJSON, immagini) sono ammessi come file aggiuntivi: la
+  regola vale sul codice, non sui dati.
+- **Chat backend**: Supabase Edge Function `geointel-reader-chat` esposta su
+  `https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat`.
+  Il Reader la chiama con `Authorization: Bearer <SUPABASE_ANON_KEY>` e body
+  `{dossier_id, dossier_title, brief_text, question, history}`. La history
+  è capped a 20 turni, esclude il messaggio user appena inviato. La chiave
+  anon è un placeholder in `app.js` (`SUPABASE_ANON_KEY`) da incollare prima
+  di ogni deploy — è la chiave pubblica anon, safe per il frontend.
+- **Dataset dossier**: dalla v2.0.0 di `data.js` ogni dossier include un
+  campo `brief_text` (~8–15 KB) che è la memoria del dossier passata come
+  contesto all'LLM. Questo campo **non deve mai essere renderizzato nel
+  DOM**: è context-only.
 
 ---
 
