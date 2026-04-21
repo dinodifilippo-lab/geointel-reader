@@ -1,4 +1,4 @@
-// CHESS Reader · data.js · v0.8.0
+// CHESS Reader · data.js · v0.8.1
 // Mock data for Atlas + 3 dossiers
 
 window.CHESS_DATA = {

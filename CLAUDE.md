@@ -119,17 +119,20 @@ Light editorial, non dark.
   panel + intel panel nella upper-strip (360px di altezza) e report panel
   full-width in basso.
 - **Empty state**: all'apertura — o ogni volta che non c'è ancora un report
-  generato — la metà destra mostra Atlas come sfondo ambient (mappa + cluster
-  + orbital ring), non cliccabile come router. Alla prima domanda, Atlas
+  generato — la metà destra mostra Atlas (mappa + cluster + orbital ring).
+  **Atlas è cliccabile** come scorciatoia visuale ai dossier, ma non è
+  l'entrypoint primario: la chat lo è. Alla prima domanda risolta, Atlas
   dissolve e lascia il posto a graph + intel + report generati.
-- **Atlas full**: un bottone "Expand" su Atlas ambient apre una vista Atlas a
-  schermo intero, navigabile (zoom/pan/LOD — world → region → dossier-detail).
-  Un bottone "← Back" riporta alla working surface senza perdere la chat.
-- **Atlas info sheet**: nel full Atlas, click su cluster/dossier apre un
-  pannello laterale con descrizione + bottone "Ask about this" che chiude il
-  full, torna alla working surface e pre-popola l'input della chat con una
-  domanda generica sul cluster/dossier. Nessun suggerimento di domanda.
-- **Topbar**: brand, breadcrumb contestuale, icon-buttons (export / share /
+- **Interazione sull'Atlas (zoom-and-reveal)**: click su un cluster con un
+  solo dossier → navigazione diretta alla schermata report. Click su un
+  cluster con N dossier → zoom-in in place sulla regione, i dossier
+  appaiono come marker individuali, click sul marker → navigazione. Click
+  su cluster vuoto → micro-feedback (pulse del ring), no-op. Click su
+  orbital dossier → navigazione diretta. Un bottone "← World" torna al
+  livello world.
+- **Ritorno dalla schermata report**: topbar mostra un bottone "← Atlas"
+  che porta alla home (Atlas world-level).
+- **Topbar**: brand, breadcrumb/contextual, icon-buttons (export / share /
   settings).
 - Mai usare emoji nell'UI.
 
@@ -164,12 +167,14 @@ Light editorial, non dark.
 3. **Dossier = partizioni del KG.** KG globale → dossier tematici
    (partizioni configurate a priori dall'admin) → risposta (subset dalla
    query utente). Concetto interno al sistema, non esposto come primary nav.
-4. **Atlas = sfondo ambient + vista espandibile, mai router.** All'apertura
-   Atlas riempie la metà destra della working surface per evitare l'empty
-   state. Può essere espanso a schermo intero (zoom/pan/LOD) per
-   esplorazione visuale. Nel full, click su cluster/dossier apre un info
-   sheet con bottone "Ask about this" che seeda la chat; mai un routing
-   diretto a un dossier. Dossier trans-geografici sull'orbital ring esterno.
+4. **Atlas = mappa cliccabile come scorciatoia visuale, entrypoint
+   secondario.** Occupa la metà destra nell'empty state. Click su
+   cluster/dossier/orbital apre il relativo dossier (zoom-and-reveal per
+   i cluster con N dossier). Non esiste una vista "Atlas full" separata:
+   ambient è abbastanza grande da essere navigato in place. La chat resta
+   comunque l'entrypoint **primario** — Atlas è l'alternativa visuale per
+   chi preferisce la mappa. Dossier trans-geografici sull'orbital ring
+   esterno.
 5. **Basemap = TopoJSON world-110m (Natural Earth).** Dati geografici reali
    proiettati con la funzione Equal Earth esistente. Niente polilinee
    disegnate a mano.
