@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CHESS Reader v0.9.0 -->
+<!-- CHESS Reader v1.0.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -389,6 +389,42 @@ blockquote.pullquote cite::before { content: '\2014 '; color: var(--text-4); }
 .archive-footer { flex: 0 0 auto; padding: 10px 16px; border-top: var(--line-hair); }
 .archive-clear-all { width: 100%; padding: 7px 12px; background: #ffffff; border: 1px solid #d9d6ce; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); cursor: pointer; transition: all 0.15s ease; }
 .archive-clear-all:hover { background: var(--coral); color: #ffffff; border-color: var(--coral); }
+
+/* Make panel-action work as a button too. */
+.panel-action-btn { background: transparent; border: none; padding: 0; font: inherit; }
+.panel-action-btn:hover { text-decoration: underline; }
+
+/* Keyboard focus — consistent ring across interactive elements. */
+button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.msg-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* === Graph fullscreen overlay === */
+.graph-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: stretch; justify-content: center; animation: overlayFade 0.18s ease; }
+@keyframes overlayFade { from { opacity: 0; } to { opacity: 1; } }
+.graph-overlay-bg { position: absolute; inset: 0; background: rgba(15,15,15,0.55); cursor: zoom-out; }
+.graph-overlay-box { position: relative; margin: 40px; flex: 1 1 auto; background: #ffffff; border: 1px solid #0f0f0f; border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden; }
+.graph-overlay-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: var(--line-hair); }
+.graph-overlay-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: 20px; letter-spacing: -0.015em; color: var(--text-1); }
+.graph-overlay-close { width: 32px; height: 32px; border: 1px solid #d9d6ce; background: #ffffff; border-radius: 7px; font-size: 22px; line-height: 1; color: var(--text-2); cursor: pointer; display: grid; place-items: center; transition: all 0.15s ease; }
+.graph-overlay-close:hover { background: var(--text-1); color: #ffffff; border-color: var(--text-1); }
+.graph-overlay-canvas { flex: 1 1 auto; min-height: 0; position: relative; background: #fafaf7; }
+.graph-overlay-canvas .graph-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.graph-overlay-hint { flex: 0 0 auto; padding: 8px 20px 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-4); letter-spacing: 0.08em; text-transform: uppercase; text-align: right; font-weight: 600; }
+
+/* === Print / PDF export === */
+@media print {
+  @page { size: A4; margin: 18mm 14mm; }
+  html, body { height: auto !important; overflow: visible !important; background: #ffffff !important; }
+  .topbar, .chat-panel, .upper-strip, .graph-overlay, .archive-drawer, .info-card, .atlas-ambient, .ambient-header, .ambient-legend, .panel-header, .download-btn, .report-header-right { display: none !important; }
+  .app, #app-root, .working-surface, .right-area, .report-panel, .report-scroll { display: block !important; height: auto !important; overflow: visible !important; flex: none !important; }
+  .report-scroll { overflow: visible !important; }
+  .report { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+  .report-body p, .report-body li { color: #111 !important; }
+  .chip { background: transparent !important; border: none !important; padding: 0 !important; color: #111 !important; font-weight: 700 !important; }
+  .chip::before { display: none !important; }
+  .snapshot-query { padding: 0 0 8mm 0 !important; max-width: none !important; }
+  a { color: #111 !important; text-decoration: none !important; }
+}
 </style>
 </head>
 <body>
@@ -396,7 +432,7 @@ blockquote.pullquote cite::before { content: '\2014 '; color: var(--text-4); }
 <header class="topbar">
 <a class="brand" href="#">
 <div class="brand-mark">C</div>
-<span>CHESS<em>·</em>Reader <span class="version">v0.9.0</span></span>
+<span>CHESS<em>·</em>Reader <span class="version">v1.0.0</span></span>
 </a>
 <div id="topbar-left-extra"></div>
 <div class="topbar-center" id="topbar-center"></div>

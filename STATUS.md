@@ -3,20 +3,18 @@
 Stato corrente del Reader e prossimi step concordati. Questo file cambia ad
 ogni release.
 
-**Ultima versione deployata**: v0.9.0
+**Ultima versione deployata**: v1.0.0
 **Ultimo aggiornamento**: 2026-04-21
 
 ---
 
-## 1. Versione corrente — v0.9.0
+## 1. Versione corrente — v1.0.0
 
-Chat operativa completa: ogni query produce uno **snapshot** (report #N,
-grafo #N) indicizzato globalmente. Chip `↗ Report #N` cliccabili
-riportano allo snapshot. **Filtri grafo** Full/Actors/Assets/Events
-finalmente attivi. **Link chip↔grafo**: click su una chip nel report
-evidenzia il nodo corrispondente. **Archivio chat** con drawer UI:
-conversazioni salvate in localStorage, ripristinabili, cancellabili
-singolarmente o in blocco.
+Release di chiusura del mockup. Rispetto a v0.9.0 aggiunge: **grafo
+fullscreen overlay** (Expand button), **export PDF via print** (print
+stylesheet dedicato che isola il report), e **polish**: Esc globale
+chiude overlay/drawer/info-card, aria-label sui bottoni, focus ring
+consistente, basemap loading state nella subtitle.
 
 ### 1.1 Architettura file
 
@@ -170,32 +168,35 @@ v0.8.3 come drawer laterale.
   light editoriale, bordi hairline.
 - Deploy Vercel zero-config funzionante.
 
-### 2.2 Non implementato (arriva nei prossimi step)
+### 2.2 Non implementato (rimane oltre il mockup)
 
-- **Contenuto report/grafo davvero nuovo per query**: oggi lo snapshot
+- **Contenuto report/grafo davvero nuovo per query**: lo snapshot
   aggiunge metadata (query + timestamp), ma il body del report e il
   grafo SVG restano quelli statici del dossier mock. La generazione
   reale arriva con l'integrazione KB.
 - **Dispatch "vero"**: ancora keyword-based; evolverà con il back-end.
-- **Grafo fullscreen overlay**: v1.0.0.
-- **Export PDF del report**: v1.0.0.
+- **PDF reale**: oggi è `window.print()` con print stylesheet. Per un
+  PDF server-side (impaginazione più controllata, watermark, ecc.)
+  serve un back-end.
 - **Integrazione reale con KB**: non ancora progettata — tutto mock in
-  `data.js`.
+  `data.js`. Prossimo grande tema post-1.0.
 
 ---
 
 ## 3. Prossimi step
 
-### 3.1 v1.0.0 — Fullscreen, PDF, polish
+### 3.1 Post-1.0 — Integrazione KB reale
 
-Scope:
+Il mockup è chiuso con v1.0.0. Il prossimo salto è sostituire i dati
+hardcoded in `data.js` con chiamate al back-end GeoIntel · KB:
 
-- **Grafo fullscreen overlay**: apertura del grafo a schermo intero con
-  controlli dedicati.
-- **Generazione PDF del report** (mock o reale).
-- **Polish finale**: micro-interazioni, accessibilità, performance, audit
-  visivo completo.
-- **Eventuale documentazione per handoff** ai primi tester.
+- Endpoint query (RAG) che dato un testo restituisce dossier+report+grafo
+  pertinenti invece del dispatch keyword mock.
+- Persistenza lato server delle conversazioni (oggi solo localStorage).
+- Autenticazione utente.
+- Generazione PDF server-side per impaginazione controllata.
+
+Da definire insieme a KB quando si aprirà il tema integrazione.
 
 ---
 
