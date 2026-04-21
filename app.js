@@ -1,14 +1,14 @@
-// CHESS Reader · app.js · v0.9.0
+// CHESS Reader · app.js · v1.0.0
 
-const APP_VERSION = "0.9.0";
+const APP_VERSION = "1.0.0";
 console.log("CHESS Reader " + APP_VERSION);
 
 // ============ BASEMAP ASSET (async) ============
 let WORLD_LAND = null;
 fetch("world-110m.json")
   .then(function(r) { return r.json(); })
-  .then(function(data) { WORLD_LAND = data; render(); })
-  .catch(function(err) { console.warn("Basemap failed to load:", err); });
+  .then(function(data) { WORLD_LAND = data; BASEMAP_LOADED = true; render(); })
+  .catch(function(err) { console.warn("Basemap failed to load:", err); BASEMAP_LOADED = true; render(); });
 
 // ============ EQUAL EARTH PROJECTION ============
 function equalEarth(lon, lat) {
@@ -57,6 +57,15 @@ window.addEventListener("hashchange", function() {
 });
 window.addEventListener("DOMContentLoaded", render);
 
+// Global Esc handler: close the top-most overlay/drawer.
+window.addEventListener("keydown", function(e) {
+  if (e.key !== "Escape") return;
+  if (GRAPH_OVERLAY_OPEN) { GRAPH_OVERLAY_OPEN = false; render(); return; }
+  if (ARCHIVE_OPEN) { ARCHIVE_OPEN = false; render(); return; }
+  if (INFO_CARD.open) { INFO_CARD = { open: false, type: null, id: null }; render(); return; }
+  if (GRAPH_HIGHLIGHT) { GRAPH_HIGHLIGHT = null; render(); return; }
+});
+
 // ============ ATLAS STATE (ephemeral) ============
 let ATLAS_VIEW = { level: "world", clusterId: null };
 let INFO_CARD = { open: false, type: null, id: null };
@@ -80,6 +89,12 @@ let GRAPH_HIGHLIGHT = null; // entity name to highlight (from chip click)
 
 // Archive drawer UI state.
 let ARCHIVE_OPEN = false;
+
+// Graph fullscreen overlay state.
+let GRAPH_OVERLAY_OPEN = false;
+
+// Basemap loading flag (for empty-state placeholder).
+let BASEMAP_LOADED = false;
 
 function newChat() {
   saveChatToArchive();
@@ -156,6 +171,24 @@ function renderWorkingSurfaceHTML(dossier, snapshot) {
     '<div class="right-area">' +
       (dossier ? renderPopulatedRight(dossier, snapshot) : renderAmbientRight()) +
     '</div>' +
+    (GRAPH_OVERLAY_OPEN && dossier ? renderGraphOverlay(dossier, snapshot) : '') +
+  '</div>';
+}
+
+function renderGraphOverlay(d, snapshot) {
+  const displayNum = snapshot ? snapshot.reportNum : d.current_report_id;
+  return '<div class="graph-overlay" role="dialog" aria-label="Graph fullscreen">' +
+    '<div class="graph-overlay-bg" data-overlay-dismiss="1"></div>' +
+    '<div class="graph-overlay-box">' +
+      '<div class="graph-overlay-header">' +
+        '<div class="graph-overlay-title">Graph <span class="report-num">#' + displayNum + '</span> · ' + d.title + '</div>' +
+        '<button class="graph-overlay-close" id="graph-overlay-close" type="button" aria-label="Close">×</button>' +
+      '</div>' +
+      '<div class="graph-overlay-canvas">' +
+        '<svg class="graph-svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet">' + d.graph_svg + '</svg>' +
+      '</div>' +
+      '<div class="graph-overlay-hint">Esc to close</div>' +
+    '</div>' +
   '</div>';
 }
 
@@ -215,9 +248,11 @@ function renderAmbientRight() {
       '<div class="ambient-head-text">' +
         '<div class="ambient-title">Atlas' + (regionLabel ? ' <span class="ambient-sub">· ' + regionLabel + '</span>' : '') + '</div>' +
         '<div class="ambient-subtitle">' +
-          (ATLAS_VIEW.level === "region"
-            ? 'Tap a dossier to open, or ask directly in chat.'
-            : 'Ask in chat, or tap a region to drill in.') +
+          (!BASEMAP_LOADED
+            ? 'Loading basemap…'
+            : ATLAS_VIEW.level === "region"
+              ? 'Tap a dossier to open, or ask directly in chat.'
+              : 'Ask in chat, or tap a region to drill in.') +
         '</div>' +
       '</div>' +
       headerRight +
@@ -300,7 +335,7 @@ function renderPopulatedRight(d, snapshot) {
     '<section class="graph-panel"' + filterStateAttr + hlAttr + '>' +
       '<div class="panel-header">' +
         '<span class="panel-title">Graph <span class="report-num">#' + displayNum + '</span></span>' +
-        '<span class="panel-action">Expand</span>' +
+        '<button class="panel-action panel-action-btn" id="graph-expand-btn" type="button" aria-label="Open graph fullscreen">Expand</button>' +
       '</div>' +
       '<div class="graph-controls">' +
         '<button class="graph-ctrl' + (GRAPH_FILTER === "full" ? " active" : "") + '" data-filter="full">Full</button>' +
@@ -447,6 +482,18 @@ function wireCommonChrome() {
   // Archive drawer toggle.
   const archBtn = document.getElementById("archive-btn");
   if (archBtn) archBtn.addEventListener("click", function() { ARCHIVE_OPEN = !ARCHIVE_OPEN; render(); });
+  // Graph fullscreen expand + close + overlay dismiss.
+  const expandBtn = document.getElementById("graph-expand-btn");
+  if (expandBtn) expandBtn.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = true; render(); });
+  const overlayClose = document.getElementById("graph-overlay-close");
+  if (overlayClose) overlayClose.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = false; render(); });
+  document.querySelectorAll("[data-overlay-dismiss]").forEach(function(el) {
+    el.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = false; render(); });
+  });
+  // PDF export: plain window.print() with @media print CSS.
+  document.querySelectorAll(".download-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { window.print(); });
+  });
   // Report chip navigation in the chat messages — routes to snapshot number.
   document.querySelectorAll(".msg-link[data-report-num]").forEach(function(a) {
     a.addEventListener("click", function(e) {
