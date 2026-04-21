@@ -167,14 +167,14 @@ Light editorial, non dark.
 3. **Dossier = partizioni del KG.** KG globale → dossier tematici
    (partizioni configurate a priori dall'admin) → risposta (subset dalla
    query utente). Concetto interno al sistema, non esposto come primary nav.
-4. **Atlas = mappa cliccabile come scorciatoia visuale, entrypoint
-   secondario.** Occupa la metà destra nell'empty state. Click su
-   cluster/dossier/orbital apre il relativo dossier (zoom-and-reveal per
-   i cluster con N dossier). Non esiste una vista "Atlas full" separata:
-   ambient è abbastanza grande da essere navigato in place. La chat resta
-   comunque l'entrypoint **primario** — Atlas è l'alternativa visuale per
-   chi preferisce la mappa. Dossier trans-geografici sull'orbital ring
-   esterno.
+4. **Atlas = mappa informativa, non router.** Occupa la metà destra
+   nell'empty state. Click su cluster/dossier/orbital apre una **info
+   card** (descrizione + actors + meta) — **non** naviga al report. Il
+   report si raggiunge solo tramite chat. Zoom-and-reveal attivo su
+   cluster con N≥2 dossier. Cluster vuoti: pulse rosso no-op. Nessuna
+   vista Atlas full-screen separata. Chat resta l'entrypoint primario
+   all'analisi; Atlas dà all'utente l'idea di quali tensioni sono
+   attive. Dossier trans-geografici sull'orbital ring esterno.
 5. **Basemap = TopoJSON world-110m (Natural Earth).** Dati geografici reali
    proiettati con la funzione Equal Earth esistente. Niente polilinee
    disegnate a mano.

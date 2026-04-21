@@ -1,6 +1,6 @@
-// CHESS Reader · app.js · v0.8.1
+// CHESS Reader · app.js · v0.8.2
 
-const APP_VERSION = "0.8.1";
+const APP_VERSION = "0.8.2";
 console.log("CHESS Reader " + APP_VERSION);
 
 // ============ BASEMAP ASSET (async) ============
@@ -49,11 +49,40 @@ window.addEventListener("hashchange", function() {
 });
 window.addEventListener("DOMContentLoaded", render);
 
-// ============ ATLAS AMBIENT STATE (ephemeral) ============
+// ============ ATLAS STATE (ephemeral) ============
 let ATLAS_VIEW = { level: "world", clusterId: null };
+let INFO_CARD = { open: false, type: null, id: null };
 
-// ============ LOCAL CHAT APPENDS (ephemeral) ============
-const LOCAL_CHAT = {}; // dossierId -> [messages]
+// ============ GLOBAL CHAT ============
+const GREETING_MSG = {
+  role: "ai",
+  time: "Now",
+  text: "Hello. Ask me about any geopolitical tension in the world — I will synthesise a dossier from the Knowledge Graph, combining entity-level analysis, arcs with polarity and volatility, and an editorial report."
+};
+let GLOBAL_CHAT = [Object.assign({}, GREETING_MSG)];
+let REPORT_COUNTER = 0; // increments on each AI response that produces a report
+
+function newChat() {
+  saveChatToArchive();
+  GLOBAL_CHAT = [Object.assign({}, GREETING_MSG)];
+  REPORT_COUNTER = 0;
+  ATLAS_VIEW = { level: "world", clusterId: null };
+  INFO_CARD = { open: false, type: null, id: null };
+  if (window.location.hash) window.location.hash = "";
+  else render();
+}
+
+function saveChatToArchive() {
+  if (!GLOBAL_CHAT || GLOBAL_CHAT.length <= 1) return;
+  try {
+    const raw = localStorage.getItem("gir_chat_archive") || "[]";
+    const arr = JSON.parse(raw);
+    arr.push({ startedAt: Date.now(), messages: GLOBAL_CHAT });
+    localStorage.setItem("gir_chat_archive", JSON.stringify(arr));
+  } catch (e) {
+    console.warn("Archive save failed:", e);
+  }
+}
 
 // ============ RENDER ROOT ============
 function render() {
@@ -105,26 +134,25 @@ function renderWorkingSurfaceHTML(dossier) {
   '</div>';
 }
 
-function renderChatPanel(dossier) {
-  const liveMessages = dossier ? getLiveChat(dossier) : [];
-  const count = dossier ? liveMessages.length : 1;
-  const metaLabel = dossier ? (count + " msg · Session") : "Ready";
-
-  let messagesHTML;
-  if (dossier) {
-    messagesHTML = '<div class="day-sep">Today · ' + formatToday() + '</div>' +
-      liveMessages.map(renderMessage).join("");
-  } else {
-    messagesHTML =
-      '<div class="msg ai"><div class="msg-bubble">Hello. Ask me about any geopolitical tension in the world — I will synthesise a dossier from the Knowledge Graph, combining entity-level analysis, arcs with polarity and volatility, and an editorial report.</div><div class="msg-time">Now</div></div>';
-  }
+function renderChatPanel(_dossier) {
+  const count = GLOBAL_CHAT.length;
+  const metaLabel = count <= 1 ? "Ready" : count + " msg · Session";
+  const isEmpty = count <= 1;
+  const messagesHTML = (isEmpty ? "" : '<div class="day-sep">Today · ' + formatToday() + '</div>') +
+    GLOBAL_CHAT.map(renderMessage).join("");
 
   return '<aside class="chat-panel">' +
     '<div class="panel-header">' +
       '<span class="panel-title">Chat</span>' +
-      '<span class="panel-meta">' + metaLabel + '</span>' +
+      '<div class="chat-header-right">' +
+        '<button class="new-chat-btn" id="new-chat-btn" title="New chat">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
+          '<span>New</span>' +
+        '</button>' +
+        '<span class="panel-meta">' + metaLabel + '</span>' +
+      '</div>' +
     '</div>' +
-    '<div class="chat-messages' + (dossier ? '' : ' empty') + '" id="chat-messages">' +
+    '<div class="chat-messages' + (isEmpty ? ' empty' : '') + '" id="chat-messages">' +
       messagesHTML +
     '</div>' +
     '<form class="chat-input-wrap" id="chat-form">' +
@@ -136,11 +164,6 @@ function renderChatPanel(dossier) {
       '</div>' +
     '</form>' +
   '</aside>';
-}
-
-function getLiveChat(dossier) {
-  const appended = LOCAL_CHAT[dossier.id] || [];
-  return dossier.chat.concat(appended);
 }
 
 function formatToday() {
@@ -173,6 +196,7 @@ function renderAmbientRight() {
     '</div>' +
     '<div class="atlas-ambient-map" id="atlas-ambient-map">' +
       renderAtlasSVG() +
+      (INFO_CARD.open ? renderInfoCard() : '') +
     '</div>' +
     '<div class="ambient-legend">' +
       '<div class="legend-group"><span class="legend-dot" style="background:#0d7a6e"></span><span>Active dossier</span></div>' +
@@ -198,6 +222,28 @@ function renderAtlasSVG() {
     '<g class="region-dossiers">' + regionDossiers + '</g>' +
     '<g class="orbital-ring">' + (showOrbital ? renderOrbitalMarkers(labelScale) : '') + '</g>' +
   '</svg>';
+}
+
+function renderInfoCard() {
+  if (INFO_CARD.type !== "dossier") return '';
+  const d = CHESS_DATA.dossiers[INFO_CARD.id];
+  if (!d) return '';
+  const actors = (d.actors || []).map(function(a) {
+    return '<span class="actor-chip">' + a + '</span>';
+  }).join("");
+  const cluster = d.cluster_id ? CHESS_DATA.clusters.find(function(x){return x.id === d.cluster_id;}) : null;
+  const eyebrow = d.trans_geographic ? "Trans-geographic" : (cluster ? cluster.label : "Dossier");
+  return '<aside class="info-card" role="dialog" aria-label="Dossier information">' +
+    '<button class="info-card-close" title="Close">×</button>' +
+    '<div class="info-card-eyebrow">' + eyebrow + '</div>' +
+    '<h2 class="info-card-title">' + d.title + '</h2>' +
+    '<p class="info-card-desc">' + d.description + '</p>' +
+    '<div class="info-card-section-label">Actors</div>' +
+    '<div class="actor-list">' + actors + '</div>' +
+    '<div class="info-card-foot">' +
+      '<span>' + d.stats.entities + ' entities · ' + d.stats.relations + ' arcs · ' + d.stats.corpus + ' articles</span>' +
+    '</div>' +
+  '</aside>';
 }
 
 function computeAmbientViewBox() {
@@ -342,15 +388,28 @@ function renderOrbitalMarkers(labelScale) {
 function wireWorkingSurface(dossier) {
   wireChatForm(dossier);
   wireGraphCtrls();
-
+  wireCommonChrome();
   if (!dossier) {
     wireAmbientInteractions();
   }
 }
 
+function wireCommonChrome() {
+  // New chat button lives in the chat panel, present on both routes.
+  const newBtn = document.getElementById("new-chat-btn");
+  if (newBtn) newBtn.addEventListener("click", newChat);
+  // Report chip navigation in the chat messages.
+  document.querySelectorAll(".msg-link[data-report-dossier]").forEach(function(a) {
+    a.addEventListener("click", function(e) {
+      e.preventDefault();
+      const id = a.getAttribute("data-report-dossier");
+      window.location.hash = "report/" + id;
+    });
+  });
+}
+
 function wireAmbientInteractions() {
-  // Cluster clicks: world → region (if >1 dossier) or direct to report (if exactly 1).
-  // In region view, re-clicking a cluster does nothing.
+  // Cluster: N=0 pulse; N=1 info card for that dossier; N>=2 zoom-and-reveal.
   document.querySelectorAll(".cluster-marker").forEach(function(el) {
     el.addEventListener("click", function(e) {
       e.stopPropagation();
@@ -358,44 +417,54 @@ function wireAmbientInteractions() {
       const c = CHESS_DATA.clusters.find(function(x){return x.id === id;});
       if (!c) return;
       if (c.dossier_ids.length === 0) {
-        // empty cluster — brief shake
         el.classList.add("shake");
         setTimeout(function(){ el.classList.remove("shake"); }, 400);
         return;
       }
       if (c.dossier_ids.length === 1) {
-        window.location.hash = "report/" + c.dossier_ids[0];
+        INFO_CARD = { open: true, type: "dossier", id: c.dossier_ids[0] };
+        render();
         return;
       }
-      // multiple dossiers → zoom & reveal
       ATLAS_VIEW = { level: "region", clusterId: id };
+      INFO_CARD = { open: false, type: null, id: null };
       render();
     });
   });
-  // Dossier markers (region view)
+  // Dossier markers in region view → info card for that dossier
   document.querySelectorAll(".dossier-marker").forEach(function(el) {
     el.addEventListener("click", function(e) {
       e.stopPropagation();
       const id = el.getAttribute("data-dossier-id");
-      window.location.hash = "report/" + id;
+      INFO_CARD = { open: true, type: "dossier", id: id };
+      render();
     });
   });
-  // Orbital items → direct to report
+  // Orbital dossier → info card
   document.querySelectorAll(".orbital-item").forEach(function(el) {
     el.addEventListener("click", function(e) {
       e.stopPropagation();
       const id = el.getAttribute("data-dossier-id");
-      window.location.hash = "report/" + id;
+      INFO_CARD = { open: true, type: "dossier", id: id };
+      render();
     });
   });
-  // Back to world
+  // Back to world zoom
   const backBtn = document.getElementById("ambient-back");
   if (backBtn) {
     backBtn.addEventListener("click", function() {
       ATLAS_VIEW = { level: "world", clusterId: null };
+      INFO_CARD = { open: false, type: null, id: null };
       render();
     });
   }
+  // Info card close
+  document.querySelectorAll(".info-card-close").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      INFO_CARD = { open: false, type: null, id: null };
+      render();
+    });
+  });
 }
 
 function wireGraphCtrls() {
@@ -430,54 +499,50 @@ function wireChatForm(dossier) {
   });
 }
 
-function handleChatSubmit(text, currentDossier) {
+function handleChatSubmit(text, _currentDossier) {
   const targetId = dispatchQuery(text);
   const now = formatNow();
+  REPORT_COUNTER += 1;
+  const reportNum = REPORT_COUNTER;
 
-  if (currentDossier && currentDossier.id === targetId) {
-    // Stay on the same dossier: append user + pending AI, then resolve AI after delay.
-    appendLocalMessage(targetId, { role: "user", time: now, text: escapeHTML(text) });
-    appendLocalMessage(targetId, { role: "ai", time: now, text: "Synthesising from the subgraph", pending: true });
+  GLOBAL_CHAT.push({ role: "user", time: now, text: escapeHTML(text) });
+  GLOBAL_CHAT.push({
+    role: "ai",
+    time: now,
+    text: "Synthesising from the " + (CHESS_DATA.dossiers[targetId] ? CHESS_DATA.dossiers[targetId].title : "") + " subgraph",
+    pending: true,
+    report_dossier: targetId,
+    report_num: reportNum
+  });
+
+  const currentHash = window.location.hash.replace(/^#/, "");
+  const targetHash = "report/" + targetId;
+  if (currentHash === targetHash) {
     render();
-    setTimeout(function() {
-      // Replace the pending with a resolved AI message.
-      const arr = LOCAL_CHAT[targetId] || [];
-      const last = arr[arr.length - 1];
-      if (last && last.pending) {
-        last.pending = false;
-        last.text = mockAIResponse(text, CHESS_DATA.dossiers[targetId]);
-        last.time = formatNow();
-      }
-      render();
-    }, 900);
   } else {
-    // Switch to target dossier: seed its local chat with the user query + pending AI.
-    appendLocalMessage(targetId, { role: "user", time: now, text: escapeHTML(text) });
-    appendLocalMessage(targetId, { role: "ai", time: now, text: "Synthesising from the subgraph", pending: true });
-    window.location.hash = "report/" + targetId;
-    setTimeout(function() {
-      const arr = LOCAL_CHAT[targetId] || [];
-      const last = arr[arr.length - 1];
-      if (last && last.pending) {
-        last.pending = false;
-        last.text = mockAIResponse(text, CHESS_DATA.dossiers[targetId]);
-        last.time = formatNow();
-      }
-      render();
-    }, 900);
+    window.location.hash = targetHash;
   }
-}
 
-function appendLocalMessage(dossierId, msg) {
-  if (!LOCAL_CHAT[dossierId]) LOCAL_CHAT[dossierId] = [];
-  LOCAL_CHAT[dossierId].push(msg);
+  setTimeout(function() {
+    for (let i = GLOBAL_CHAT.length - 1; i >= 0; i--) {
+      const m = GLOBAL_CHAT[i];
+      if (m.pending && m.report_dossier === targetId && m.report_num === reportNum) {
+        m.pending = false;
+        m.text = mockAIResponse(text, CHESS_DATA.dossiers[targetId]);
+        m.time = formatNow();
+        break;
+      }
+    }
+    render();
+  }, 900);
 }
 
 function dispatchQuery(text) {
   const t = text.toLowerCase();
-  if (/\b(hormuz|iran|gulf|persian|gcc|strait of hormuz)\b/.test(t)) return "iran-hormuz";
-  if (/\b(taiwan|china\s+sea|tsmc|south\s+china|formosa|pla)\b/.test(t)) return "taiwan-strait";
-  if (/\b(ai|a\.i\.|semiconductor|chip|lithography|asml|nvidia|tech\s+rivalry)\b/.test(t)) return "ai-us-china";
+  if (/\b(houthi|houthis|red\s+sea|bab|bab-el-mandeb|suez|ansar\s+allah|prosperity\s+guardian)\b/.test(t)) return "red-sea-houthis";
+  if (/\b(hormuz|iran|gulf|persian|gcc|strait of hormuz|irgc)\b/.test(t)) return "iran-hormuz";
+  if (/\b(taiwan|china\s+sea|tsmc|south\s+china|formosa|pla|indopacom)\b/.test(t)) return "taiwan-strait";
+  if (/\b(ai|a\.i\.|semiconductor|chip|lithography|asml|nvidia|tech\s+rivalry|compute)\b/.test(t)) return "ai-us-china";
   return "iran-hormuz";
 }
 
@@ -502,7 +567,12 @@ function renderMessage(m) {
   if (m.role === "user") {
     return '<div class="msg user"><div class="msg-bubble">' + m.text + '</div><div class="msg-time">' + m.time + '</div></div>';
   }
-  const reportLink = m.report_id ? '<a class="msg-link">↗ Report #' + m.report_id + ' →</a>' : "";
+  let reportLink = "";
+  if (!m.pending && m.report_dossier && m.report_num) {
+    reportLink = '<a class="msg-link" data-report-dossier="' + m.report_dossier + '" href="#report/' + m.report_dossier + '">↗ Report #' + m.report_num + ' →</a>';
+  } else if (m.report_id) {
+    reportLink = '<a class="msg-link">↗ Report #' + m.report_id + ' →</a>';
+  }
   const dots = m.pending ? '<span class="dots"></span>' : "";
   return '<div class="msg ai ' + (m.pending ? "pending" : "") + '"><div class="msg-bubble">' + m.text + dots + '</div>' + reportLink + '<div class="msg-time">' + m.time + '</div></div>';
 }

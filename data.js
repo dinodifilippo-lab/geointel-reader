@@ -1,10 +1,10 @@
-// CHESS Reader · data.js · v0.8.1
+// CHESS Reader · data.js · v0.8.2
 // Mock data for Atlas + 3 dossiers
 
 window.CHESS_DATA = {
 
   clusters: [
-    { id: "middle-east", label: "Middle East", lat: 29.0, lon: 50.0, dossier_ids: ["iran-hormuz"],
+    { id: "middle-east", label: "Middle East", lat: 29.0, lon: 50.0, dossier_ids: ["iran-hormuz", "red-sea-houthis"],
       description: "Strutturalmente la regione più volatile del grafo: chokepoint energetici (Hormuz, Bab-el-Mandeb), attori statali con posture ambigue, e una fitta rete di archi ad alta polarità negativa che collegano Iran, Gulf states e presenza militare USA." },
     { id: "east-asia", label: "East Asia", lat: 24.0, lon: 121.0, dossier_ids: ["taiwan-strait"],
       description: "Cluster dominato dalla tensione Taiwan-strait: semiconduttori come asset strategico, presenza navale USA/Giappone, e un grafo ad alta confidenza ma bassa reversibilità sui principali archi militari." },
@@ -27,6 +27,7 @@ window.CHESS_DATA = {
       lat: 26.5,
       lon: 56.3,
       description: "Lo Stretto di Hormuz come sistema: postura navale iraniana, hedging del Golfo, presenza USA Fifth Fleet, e il ruolo del mercato assicurativo londinese come moltiplicatore sistemico del rischio.",
+      actors: ["Iran (State)", "IRGC-Navy", "US 5th Fleet", "UKMTO", "GCC bloc"],
       stats: { entities: 12, relations: 28, events: 5, corpus: 147, sources: 4, last_update: "2h ago" },
       chat: [
         { role: "user", time: "14:02", text: "What is the current state of tensions in the Hormuz Strait given Iran's posture?" },
@@ -73,6 +74,52 @@ window.CHESS_DATA = {
       graph_svg: '<defs><radialGradient id="glowTeal" cx="50%" cy="50%"><stop offset="0%" stop-color="#0d7a6e" stop-opacity="0.22"/><stop offset="100%" stop-color="#0d7a6e" stop-opacity="0"/></radialGradient><radialGradient id="glowAmber" cx="50%" cy="50%"><stop offset="0%" stop-color="#a8570f" stop-opacity="0.22"/><stop offset="100%" stop-color="#a8570f" stop-opacity="0"/></radialGradient><radialGradient id="glowViolet" cx="50%" cy="50%"><stop offset="0%" stop-color="#5b21b6" stop-opacity="0.22"/><stop offset="100%" stop-color="#5b21b6" stop-opacity="0"/></radialGradient><marker id="arrowCoral" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b8203a"/></marker><marker id="arrowSage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#15803d"/></marker><marker id="arrowMuted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9e9b94"/></marker></defs><g stroke="#e8e4d6" stroke-width="0.5" opacity="0.7"><line x1="0" y1="90" x2="720" y2="90"/><line x1="0" y1="180" x2="720" y2="180"/><line x1="0" y1="270" x2="720" y2="270"/><line x1="180" y1="0" x2="180" y2="360"/><line x1="360" y1="0" x2="360" y2="360"/><line x1="540" y1="0" x2="540" y2="360"/></g><path d="M 160 110 Q 360 160 560 210" stroke="#b8203a" stroke-width="3.5" fill="none" marker-end="url(#arrowCoral)" opacity="0.85"/><path d="M 160 280 Q 120 190 155 115" stroke="#b8203a" stroke-width="2.5" fill="none" marker-end="url(#arrowCoral)" opacity="0.65"/><path d="M 360 60 Q 270 80 170 105" stroke="#9e9b94" stroke-width="1.5" fill="none" marker-end="url(#arrowMuted)" opacity="0.55"/><path d="M 580 90 Q 600 150 570 205" stroke="#15803d" stroke-width="2.5" fill="none" marker-end="url(#arrowSage)" opacity="0.7"/><path d="M 165 115 Q 370 180 558 210" stroke="#b8203a" stroke-width="2" fill="none" marker-end="url(#arrowCoral)" opacity="0.45"/><path d="M 390 310 Q 475 260 560 215" stroke="#15803d" stroke-width="2" fill="none" marker-end="url(#arrowSage)" opacity="0.55"/><path d="M 390 295 Q 380 180 370 75" stroke="#9e9b94" stroke-width="1.2" fill="none" marker-end="url(#arrowMuted)" opacity="0.45" stroke-dasharray="4,4"/><g class="graph-node"><circle cx="160" cy="110" r="26" fill="url(#glowTeal)"/><circle cx="160" cy="110" r="13" fill="#ffffff" stroke="#0d7a6e" stroke-width="3"/><text class="graph-label" x="160" y="146" text-anchor="middle">IRGC-NAVY</text></g><g class="graph-node"><circle cx="360" cy="60" r="20" fill="url(#glowTeal)"/><circle cx="360" cy="60" r="10" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="360" y="38" text-anchor="middle">IRAN (STATE)</text></g><g class="graph-node"><circle cx="160" cy="280" r="20" fill="url(#glowTeal)"/><circle cx="160" cy="280" r="10" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="160" y="306" text-anchor="middle">US 5TH FLEET</text></g><g class="graph-node"><circle cx="580" cy="90" r="18" fill="url(#glowTeal)"/><circle cx="580" cy="90" r="9" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="580" y="68" text-anchor="middle">GCC</text></g><g class="graph-node"><circle cx="390" cy="315" r="17" fill="url(#glowTeal)"/><circle cx="390" cy="315" r="8" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="390" y="340" text-anchor="middle">UKMTO</text></g><g class="graph-node"><circle cx="560" cy="215" r="28" fill="url(#glowAmber)"/><rect x="548" y="203" width="24" height="24" rx="3" fill="#ffffff" stroke="#a8570f" stroke-width="3" transform="rotate(45 560 215)"/><text class="graph-label" x="560" y="252" text-anchor="middle" fill="#a8570f">HORMUZ</text></g><g class="graph-node"><circle cx="390" cy="295" r="16" fill="url(#glowAmber)"/><rect x="383" y="288" width="14" height="14" rx="2" fill="#ffffff" stroke="#a8570f" stroke-width="2.5" transform="rotate(45 390 295)"/></g><g class="graph-node"><circle cx="310" cy="200" r="16" fill="url(#glowViolet)"/><polygon points="310,190 320,204 300,204" fill="#ffffff" stroke="#5b21b6" stroke-width="2.5"/><text class="graph-label" x="310" y="228" text-anchor="middle" fill="#5b21b6">JAN 18</text></g>'
     },
 
+    "red-sea-houthis": {
+      id: "red-sea-houthis",
+      title: "Red Sea · Houthi",
+      cluster_id: "middle-east",
+      lat: 13.5,
+      lon: 43.2,
+      description: "Bab-el-Mandeb e mar Rosso come secondo chokepoint strutturale del Middle East: campagna Houthi contro il traffico commerciale, coalizione Prosperity Guardian, impatto sulle rotte Suez e ricadute fiscali su Egitto e supply chain europee.",
+      actors: ["Ansar Allah (Houthi)", "US CENTCOM · Prosperity Guardian", "UK Royal Navy", "Saudi Arabia", "Iran (State)", "Egypt"],
+      stats: { entities: 10, relations: 22, events: 6, corpus: 112, sources: 4, last_update: "5h ago" },
+      chat: [],
+      current_report_id: 1,
+      reports: {
+        1: {
+          id: 1,
+          title: "The <em>Secondary Strait</em>: Bab-el-Mandeb under Houthi Pressure",
+          subtitle: "Houthi anti-shipping campaign, Prosperity Guardian posture, and the reshaping of Europe–Asia trade routes.",
+          timestamp: "Apr 20, 2026 · 09:15 UTC",
+          executive_summary: "Houthi attacks on Red Sea commercial shipping have evolved from episodic disruption to a <strong>persistent structural cost</strong>. A plausible next phase raises European insurance volumes by 35-50% and cements Cape of Good Hope rerouting as a new equilibrium — with spillover into Suez revenue and Egyptian fiscal stability.",
+          body_html: '<h2 data-num="01">Theatre architecture</h2><p>Five actors define the current Bab-el-Mandeb configuration. The <span class="chip actor">● Ansar Allah (Houthi)</span> movement is the operational protagonist; <span class="chip actor">● US CENTCOM / Prosperity Guardian</span> and <span class="chip actor">● UK Royal Navy</span> represent the coalition response; <span class="chip actor">● Saudi Arabia</span> and <span class="chip actor">● Iran (State)</span> function as shadow patrons of conflicting agendas.</p><p>Ansar Allah has achieved a capability curve that political analysts in 2022 rated a low-probability scenario: sustained beyond-horizon anti-ship attacks with at least three distinct missile families.</p><h2 data-num="02">Assets under pressure</h2><p>Three assets dominate the tension field: <span class="chip asset">◆ Bab-el-Mandeb</span> strait, the <span class="chip asset">◆ Suez Canal</span> revenue stream, and <span class="chip asset">◆ Europe-Asia liner schedules</span>.</p><h3>High-weight arcs to monitor</h3><ul class="report-list"><li><strong>Ansar Allah → Commercial Shipping</strong> · coercive, weight 0.84, volatility high, polarity strongly negative.</li><li><strong>Iran → Ansar Allah</strong> · enabling, weight 0.66, volatility low, polarity negative-indirect.</li><li><strong>Prosperity Guardian → Ansar Allah</strong> · interdiction, weight 0.58, volatility medium, polarity negative. Largely reactive.</li></ul><blockquote class="pullquote">The Red Sea is no longer a route on which rare disruption happens; it is a route whose baseline cost of use has been reset. Planning teams priced this in twelve months ago.<cite>Bruegel · Working Paper · March 2026</cite></blockquote><h2 data-num="03">Events and inflection</h2><p>Six events shape the current picture. The most consequential are the <span class="chip event">▲ Shift to ballistic-only campaign (Feb 2026)</span> and the <span class="chip event">▲ Egyptian FX drawdown (Mar 2026)</span>. The Cape route has become logistically viable for premium cargo, shifting pricing power.</p><div class="data-callout"><div class="data-callout-cell"><div class="dc-label">Strikes Q1</div><div class="dc-value coral">41</div><div class="dc-hint">+15% vs Q4 2025</div></div><div class="data-callout-cell"><div class="dc-label">Suez revenue</div><div class="dc-value">-52%</div><div class="dc-hint">YoY, through Mar 2026</div></div><div class="data-callout-cell"><div class="dc-label">Confidence</div><div class="dc-value sage">0.74</div><div class="dc-hint">Corroborated ≥2 sources</div></div></div><h2 data-num="04">What would shift the system</h2><p>Two variables dominate the trajectory: (i) Iran\'s willingness to extract restraint from the Houthis in exchange for sanctions relief; (ii) Egyptian fiscal capacity to absorb the revenue shock without requesting external assistance. Neither is currently moving decisively.</p>',
+          sources: [
+            { num: "01", title: "The Houthi maritime campaign: capability curve update", meta: "ECFR · Policy Brief", date: "2026-03-18" },
+            { num: "02", title: "Cape of Good Hope as the new normal: shipping economics", meta: "Bruegel · Working Paper", date: "2026-03-02" },
+            { num: "03", title: "Egypt fiscal fragility under Suez revenue loss", meta: "ISPI · Commentary", date: "2026-02-25" },
+            { num: "04", title: "Prosperity Guardian: a net assessment one year in", meta: "MERICS · Policy Monitor", date: "2026-02-09" }
+          ]
+        }
+      },
+      intel: {
+        confidence: { value: 0.74, label: "Moderate-high confidence", note: "Corroborated across ≥2 sources. Weakest: Iran-Houthi command relationship (0.48)." },
+        top_arcs: [
+          { from: "Ansar Allah", to: "Shipping", type: "coercive", weight: 0.84, polarity: "neg", volatility: "H" },
+          { from: "Iran", to: "Ansar Allah", type: "enabling", weight: 0.66, polarity: "neg", volatility: "L" },
+          { from: "Prosp. Guardian", to: "Ansar Allah", type: "interdiction", weight: 0.58, polarity: "neg", volatility: "M" }
+        ],
+        events: [
+          { date: "2026-03-14", title: "Egyptian FX reserves drawdown signals Suez pressure", active: true },
+          { date: "2026-02-08", title: "Shift to ballistic-only anti-ship campaign" },
+          { date: "2026-01-22", title: "UK frigate HMS Diamond intercepts Houthi UAS salvo" },
+          { date: "2025-12-18", title: "Saudi-Houthi backchannel talks paused in Muscat" },
+          { date: "2025-11-30", title: "Maersk announces indefinite Cape routing for Europe" },
+          { date: "2025-10-12", title: "First strike on US-flagged commercial vessel" }
+        ]
+      },
+      graph_svg: '<defs><radialGradient id="glowTealRS" cx="50%" cy="50%"><stop offset="0%" stop-color="#0d7a6e" stop-opacity="0.22"/><stop offset="100%" stop-color="#0d7a6e" stop-opacity="0"/></radialGradient><radialGradient id="glowAmberRS" cx="50%" cy="50%"><stop offset="0%" stop-color="#a8570f" stop-opacity="0.22"/><stop offset="100%" stop-color="#a8570f" stop-opacity="0"/></radialGradient><radialGradient id="glowVioletRS" cx="50%" cy="50%"><stop offset="0%" stop-color="#5b21b6" stop-opacity="0.22"/><stop offset="100%" stop-color="#5b21b6" stop-opacity="0"/></radialGradient><marker id="arrowCoralRS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b8203a"/></marker><marker id="arrowSageRS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#15803d"/></marker><marker id="arrowMutedRS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9e9b94"/></marker></defs><g stroke="#e8e4d6" stroke-width="0.5" opacity="0.7"><line x1="0" y1="90" x2="720" y2="90"/><line x1="0" y1="180" x2="720" y2="180"/><line x1="0" y1="270" x2="720" y2="270"/><line x1="180" y1="0" x2="180" y2="360"/><line x1="360" y1="0" x2="360" y2="360"/><line x1="540" y1="0" x2="540" y2="360"/></g><path d="M 150 200 Q 340 180 540 170" stroke="#b8203a" stroke-width="3.5" fill="none" marker-end="url(#arrowCoralRS)" opacity="0.85"/><path d="M 100 80 Q 130 140 148 195" stroke="#b8203a" stroke-width="2.5" fill="none" marker-end="url(#arrowCoralRS)" opacity="0.7"/><path d="M 400 310 Q 300 260 160 205" stroke="#b8203a" stroke-width="2.2" fill="none" marker-end="url(#arrowCoralRS)" opacity="0.55"/><path d="M 605 75 Q 580 140 550 170" stroke="#15803d" stroke-width="2.3" fill="none" marker-end="url(#arrowSageRS)" opacity="0.65"/><path d="M 150 195 Q 300 260 540 300" stroke="#9e9b94" stroke-width="1.8" fill="none" marker-end="url(#arrowMutedRS)" opacity="0.55"/><path d="M 95 80 Q 300 60 395 300" stroke="#9e9b94" stroke-width="1.2" fill="none" marker-end="url(#arrowMutedRS)" opacity="0.45" stroke-dasharray="4,4"/><g class="graph-node"><circle cx="150" cy="200" r="26" fill="url(#glowTealRS)"/><circle cx="150" cy="200" r="13" fill="#ffffff" stroke="#0d7a6e" stroke-width="3"/><text class="graph-label" x="150" y="237" text-anchor="middle">ANSAR ALLAH</text></g><g class="graph-node"><circle cx="95" cy="75" r="20" fill="url(#glowTealRS)"/><circle cx="95" cy="75" r="10" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="95" y="53" text-anchor="middle">IRAN (STATE)</text></g><g class="graph-node"><circle cx="400" cy="320" r="20" fill="url(#glowTealRS)"/><circle cx="400" cy="320" r="10" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="400" y="346" text-anchor="middle">PROSP. GUARDIAN</text></g><g class="graph-node"><circle cx="605" cy="70" r="18" fill="url(#glowTealRS)"/><circle cx="605" cy="70" r="9" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.5"/><text class="graph-label" x="605" y="48" text-anchor="middle">SAUDI ARABIA</text></g><g class="graph-node"><circle cx="540" cy="305" r="16" fill="url(#glowTealRS)"/><circle cx="540" cy="305" r="8" fill="#ffffff" stroke="#0d7a6e" stroke-width="2.3"/><text class="graph-label" x="540" y="330" text-anchor="middle">EGYPT</text></g><g class="graph-node"><circle cx="540" cy="170" r="28" fill="url(#glowAmberRS)"/><rect x="528" y="158" width="24" height="24" rx="3" fill="#ffffff" stroke="#a8570f" stroke-width="3" transform="rotate(45 540 170)"/><text class="graph-label" x="540" y="210" text-anchor="middle" fill="#a8570f">BAB-EL-MANDEB</text></g><g class="graph-node"><circle cx="610" cy="220" r="18" fill="url(#glowAmberRS)"/><rect x="601" y="211" width="18" height="18" rx="2" fill="#ffffff" stroke="#a8570f" stroke-width="2.5" transform="rotate(45 610 220)"/><text class="graph-label" x="610" y="250" text-anchor="middle" fill="#a8570f">SUEZ</text></g><g class="graph-node"><circle cx="300" cy="125" r="14" fill="url(#glowVioletRS)"/><polygon points="300,117 309,130 291,130" fill="#ffffff" stroke="#5b21b6" stroke-width="2.5"/><text class="graph-label" x="300" y="151" text-anchor="middle" fill="#5b21b6">FEB \'26</text></g>'
+    },
+
     "taiwan-strait": {
       id: "taiwan-strait",
       title: "Taiwan Strait",
@@ -80,6 +127,7 @@ window.CHESS_DATA = {
       lat: 24.0,
       lon: 121.0,
       description: "Taiwan come asset strategico globale (semiconduttori avanzati) e come arco ad alta asimmetria con la Cina continentale. Presenza USA e Giappone come fattori di stabilizzazione ma anche di escalation. Bassa reversibilità dei principali archi militari.",
+      actors: ["PRC", "PLA East", "ROC (Taiwan)", "INDOPACOM", "Japan SDF", "Philippines"],
       stats: { entities: 14, relations: 32, events: 7, corpus: 198, sources: 5, last_update: "6h ago" },
       chat: [
         { role: "user", time: "10:22", text: "Assess the current posture around Taiwan given PLA grey-zone activity." },
@@ -127,6 +175,7 @@ window.CHESS_DATA = {
       description: "Competizione sistemica su compute, modelli di frontiera e supply chain dei semiconduttori. Dossier trans-geografico: gli archi attraversano USA, Cina, Taiwan, Paesi Bassi (ASML) e Corea del Sud, senza ancorarsi a una singola macro-regione.",
       cluster_id: null,
       trans_geographic: true,
+      actors: ["US BIS", "ASML (NL)", "METI (JP)", "MIIT · Chinese labs", "UAE / Malaysia re-export", "Samsung / SK (KR)"],
       stats: { entities: 18, relations: 41, events: 9, corpus: 224, sources: 6, last_update: "1d ago" },
       chat: [
         { role: "user", time: "09:15", text: "Current state of the AI compute export control regime and its effects on Chinese frontier model development." },
