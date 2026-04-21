@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CHESS Reader v0.8.2 -->
+<!-- CHESS Reader v0.9.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -348,8 +348,47 @@ blockquote.pullquote cite::before { content: '\2014 '; color: var(--text-4); }
 .source-date { color: var(--text-3); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; }
 @keyframes slideIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
-.graph-node { cursor: pointer; }
+.graph-node { cursor: pointer; transition: opacity 0.2s ease; }
 .graph-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; fill: var(--text-2); pointer-events: none; letter-spacing: 0.04em; font-weight: 600; }
+
+/* Graph filters — the parent .graph-panel carries data-graph-filter. */
+.graph-panel[data-graph-filter="actor"] .graph-node:not([data-type="actor"]) { opacity: 0.12; }
+.graph-panel[data-graph-filter="asset"] .graph-node:not([data-type="asset"]) { opacity: 0.12; }
+.graph-panel[data-graph-filter="event"] .graph-node:not([data-type="event"]) { opacity: 0.12; }
+.graph-panel[data-graph-highlight] .graph-node:not(.highlight) { opacity: 0.22; }
+.graph-node.highlight { filter: drop-shadow(0 0 6px rgba(184,32,58,0.7)); }
+.graph-node.highlight circle[stroke], .graph-node.highlight rect[stroke], .graph-node.highlight polygon[stroke] { stroke-width: 4; }
+
+/* Report chip visual hint that it's clickable. */
+.report-body .chip { cursor: pointer; user-select: none; }
+.report-body .chip:active { transform: translateY(0); opacity: 0.85; }
+
+/* Snapshot byline: query that triggered the report. */
+.snapshot-query { display: flex; align-items: baseline; gap: 10px; max-width: 820px; margin: 0 auto; padding: 16px 48px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-3); }
+.snapshot-query-label { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; color: var(--teal); }
+.snapshot-query-text { font-family: 'Fraunces', serif; font-style: italic; font-size: 14px; color: var(--text-2); font-weight: 300; }
+
+/* Archive drawer (overlays the left side over chat panel). */
+.archive-drawer { position: fixed; top: 56px; left: 0; bottom: 0; width: 320px; background: #ffffff; border-right: 1px solid #0f0f0f; box-shadow: 4px 0 20px rgba(0,0,0,0.08); z-index: 40; display: flex; flex-direction: column; animation: archiveSlide 0.22s ease; }
+@keyframes archiveSlide { from { transform: translateX(-6px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.archive-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: var(--line-hair); }
+.archive-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px; letter-spacing: -0.01em; color: var(--text-1); }
+.archive-close { width: 26px; height: 26px; border: 1px solid #d9d6ce; background: #ffffff; border-radius: 6px; font-size: 18px; line-height: 1; color: var(--text-2); cursor: pointer; display: grid; place-items: center; transition: all 0.15s ease; }
+.archive-close:hover { background: var(--text-1); color: #ffffff; border-color: var(--text-1); }
+.archive-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 10px; }
+.archive-body::-webkit-scrollbar { width: 6px; }
+.archive-body::-webkit-scrollbar-thumb { background: #e0ddd2; border-radius: 3px; }
+.archive-item { display: flex; align-items: stretch; gap: 6px; padding: 0; margin-bottom: 4px; border-radius: 8px; border: 1px solid transparent; transition: all 0.12s ease; }
+.archive-item:hover { border-color: #0f0f0f; background: #fafaf7; }
+.archive-item-main { flex: 1 1 auto; min-width: 0; padding: 10px 12px; cursor: pointer; }
+.archive-item-title { font-family: 'Fraunces', serif; font-size: 14px; font-weight: 500; color: var(--text-1); margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+.archive-item-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); letter-spacing: 0.03em; }
+.archive-delete { flex: 0 0 auto; width: 26px; margin: 8px 8px 8px 0; border: 1px solid transparent; background: transparent; border-radius: 6px; color: var(--text-4); font-size: 16px; line-height: 1; cursor: pointer; transition: all 0.12s ease; }
+.archive-delete:hover { color: var(--coral); border-color: var(--coral); }
+.archive-empty { padding: 30px 20px; font-family: 'Fraunces', serif; font-style: italic; color: var(--text-3); font-size: 14px; text-align: center; }
+.archive-footer { flex: 0 0 auto; padding: 10px 16px; border-top: var(--line-hair); }
+.archive-clear-all { width: 100%; padding: 7px 12px; background: #ffffff; border: 1px solid #d9d6ce; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); cursor: pointer; transition: all 0.15s ease; }
+.archive-clear-all:hover { background: var(--coral); color: #ffffff; border-color: var(--coral); }
 </style>
 </head>
 <body>
@@ -357,7 +396,7 @@ blockquote.pullquote cite::before { content: '\2014 '; color: var(--text-4); }
 <header class="topbar">
 <a class="brand" href="#">
 <div class="brand-mark">C</div>
-<span>CHESS<em>·</em>Reader <span class="version">v0.8.2</span></span>
+<span>CHESS<em>·</em>Reader <span class="version">v0.9.0</span></span>
 </a>
 <div id="topbar-left-extra"></div>
 <div class="topbar-center" id="topbar-center"></div>
