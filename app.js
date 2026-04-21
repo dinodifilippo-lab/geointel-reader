@@ -1,7 +1,21 @@
-// CHESS Reader · app.js · v1.0.0
+// GeoIntel Reader · app.js · v1.1.0
 
-const APP_VERSION = "1.0.0";
-console.log("CHESS Reader " + APP_VERSION);
+const APP_VERSION = "1.1.0";
+console.log("GeoIntel Reader " + APP_VERSION);
+
+// ============ LIVE CHAT BACKEND ============
+// Supabase Edge Function: geointel-reader-chat
+const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat";
+
+// TODO(user): paste your Supabase anon key here before deploying.
+// This is the public "anon" key from Supabase Project Settings -> API -> anon/public.
+// It is safe to include in the frontend.
+const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_HERE";
+
+// Ephemeral chat state for live backend.
+let CHAT_IN_FLIGHT = false;
+let CHAT_ERROR = null;
+const CHAT_HISTORY_CAP = 20;
 
 // ============ BASEMAP ASSET (async) ============
 let WORLD_LAND = null;
@@ -217,10 +231,19 @@ function renderChatPanel(_dossier) {
       messagesHTML +
     '</div>' +
     '<form class="chat-input-wrap" id="chat-form">' +
+      (CHAT_ERROR
+        ? '<div class="chat-error" id="chat-error" role="alert">' +
+            '<span class="chat-error-text">' + escapeHTML(CHAT_ERROR) + '</span>' +
+            '<button type="button" class="chat-error-dismiss" id="chat-error-dismiss" aria-label="Dismiss">×</button>' +
+          '</div>'
+        : '') +
+      (CHAT_IN_FLIGHT
+        ? '<div class="chat-loading" id="chat-loading" aria-live="polite">Analysing<span class="dots"></span></div>'
+        : '') +
       '<div class="chat-input-box">' +
-        '<textarea id="chat-textarea" placeholder="Ask anything about the world\'s tensions…" rows="1"></textarea>' +
+        '<textarea id="chat-textarea" placeholder="Ask anything about the world\'s tensions…" rows="1"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '></textarea>' +
         '<div class="chat-input-actions">' +
-          '<button type="submit" class="send-btn">Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
+          '<button type="submit" class="send-btn" id="chat-send"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '>Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
         '</div>' +
       '</div>' +
     '</form>' +
@@ -773,10 +796,11 @@ function stripHTML(s) {
   return (s || "").replace(/<[^>]*>/g, "");
 }
 
-// ============ CHAT (mock end-to-end) ============
+// ============ CHAT (live, backed by geointel-reader-chat Edge Function) ============
 function wireChatForm(dossier) {
   const form = document.getElementById("chat-form");
   const ta = document.getElementById("chat-textarea");
+  const sendBtn = document.getElementById("chat-send");
   if (!form || !ta) return;
   ta.addEventListener("input", function() {
     ta.style.height = "auto";
@@ -785,19 +809,36 @@ function wireChatForm(dossier) {
   ta.addEventListener("keydown", function(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      if (CHAT_IN_FLIGHT) return;
       form.requestSubmit();
     }
   });
   form.addEventListener("submit", function(e) {
     e.preventDefault();
+    if (CHAT_IN_FLIGHT) return;
+    if (sendBtn && sendBtn.disabled) return;
     const text = ta.value.trim();
     if (!text) return;
     handleChatSubmit(text, dossier);
   });
+  const dismiss = document.getElementById("chat-error-dismiss");
+  if (dismiss) dismiss.addEventListener("click", function() {
+    CHAT_ERROR = null;
+    render();
+  });
+  // Autofocus textarea when not in flight.
+  if (!CHAT_IN_FLIGHT && ta) ta.focus();
 }
 
 function handleChatSubmit(text, _currentDossier) {
   const targetId = dispatchQuery(text);
+  const dossier = CHESS_DATA.dossiers[targetId];
+  if (!dossier) {
+    CHAT_ERROR = "Unable to route this question to a dossier. Please rephrase.";
+    render();
+    return;
+  }
+
   const now = formatNow();
   REPORT_COUNTER += 1;
   const reportNum = REPORT_COUNTER;
@@ -809,46 +850,113 @@ function handleChatSubmit(text, _currentDossier) {
     reportNum: reportNum
   };
 
+  // Build history BEFORE pushing the new user message (Section 3.3 of the spec).
+  // Exclude the greeting (role "ai" with no report_num) is optional; we include
+  // it because the LLM tolerates it. Cap at CHAT_HISTORY_CAP turns total.
+  const history = GLOBAL_CHAT
+    .filter(function(m) { return m && (m.role === "user" || m.role === "ai") && !m.pending; })
+    .slice(-CHAT_HISTORY_CAP)
+    .map(function(m) {
+      return {
+        role: m.role === "ai" ? "assistant" : "user",
+        content: stripHTML(m.text || "")
+      };
+    });
+
   GLOBAL_CHAT.push({ role: "user", time: now, text: escapeHTML(text) });
   GLOBAL_CHAT.push({
     role: "ai",
     time: now,
-    text: "Synthesising from the " + (CHESS_DATA.dossiers[targetId] ? CHESS_DATA.dossiers[targetId].title : "") + " subgraph",
+    text: "Analysing the " + dossier.title + " subgraph",
     pending: true,
     report_dossier: targetId,
     report_num: reportNum
   });
 
+  CHAT_IN_FLIGHT = true;
+  CHAT_ERROR = null;
+
   GRAPH_FILTER = "full";
   GRAPH_HIGHLIGHT = null;
-  window.location.hash = "report/" + reportNum;
+  // Navigate to the new report; render() will run via hashchange.
+  const hash = "report/" + reportNum;
+  if (window.location.hash === "#" + hash) render(); else window.location.hash = hash;
 
-  setTimeout(function() {
+  // Fire the request. brief_text is sent as LLM context only; never rendered.
+  const payload = {
+    dossier_id: dossier.id,
+    dossier_title: dossier.title,
+    brief_text: dossier.brief_text || "",
+    question: text,
+    history: history
+  };
+
+  fetch(GEOINTEL_CHAT_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + SUPABASE_ANON_KEY
+    },
+    body: JSON.stringify(payload)
+  }).then(function(resp) {
+    if (!resp.ok) {
+      return resp.text().then(function(errText) {
+        throw new Error("HTTP " + resp.status + ": " + errText.slice(0, 200));
+      });
+    }
+    return resp.json();
+  }).then(function(data) {
+    const answer = (data && typeof data.answer === "string" && data.answer.trim())
+      ? data.answer
+      : "(empty response)";
     for (let i = GLOBAL_CHAT.length - 1; i >= 0; i--) {
       const m = GLOBAL_CHAT[i];
-      if (m.pending && m.report_dossier === targetId && m.report_num === reportNum) {
+      if (m.pending && m.report_num === reportNum) {
         m.pending = false;
-        m.text = mockAIResponse(text, CHESS_DATA.dossiers[targetId]);
+        m.text = escapeHTML(answer);
         m.time = formatNow();
         break;
       }
     }
+    CHAT_IN_FLIGHT = false;
+    CHAT_ERROR = null;
     render();
-  }, 900);
+  }).catch(function(err) {
+    console.error("Chat error:", err);
+    // Spec: keep the user's question visible; remove the pending AI placeholder;
+    // show an inline dismissible error.
+    for (let i = GLOBAL_CHAT.length - 1; i >= 0; i--) {
+      const m = GLOBAL_CHAT[i];
+      if (m.pending && m.report_num === reportNum) {
+        GLOBAL_CHAT.splice(i, 1);
+        break;
+      }
+    }
+    // Also drop the generated snapshot since no answer backs it.
+    delete GENERATED_REPORTS[reportNum];
+    if (REPORT_COUNTER === reportNum) REPORT_COUNTER -= 1;
+    CHAT_IN_FLIGHT = false;
+    CHAT_ERROR = "Unable to reach the analysis engine. Please try again.";
+    // Navigate back home since the report we were heading to does not exist.
+    if (window.location.hash === "#report/" + reportNum) {
+      window.location.hash = "";
+    } else {
+      render();
+    }
+  });
 }
 
 function dispatchQuery(text) {
-  const t = text.toLowerCase();
-  if (/\b(houthi|houthis|red\s+sea|bab|bab-el-mandeb|suez|ansar\s+allah|prosperity\s+guardian)\b/.test(t)) return "red-sea-houthis";
-  if (/\b(hormuz|iran|gulf|persian|gcc|strait of hormuz|irgc)\b/.test(t)) return "iran-hormuz";
-  if (/\b(taiwan|china\s+sea|tsmc|south\s+china|formosa|pla|indopacom)\b/.test(t)) return "taiwan-strait";
-  if (/\b(ai|a\.i\.|semiconductor|chip|lithography|asml|nvidia|tech\s+rivalry|compute)\b/.test(t)) return "ai-us-china";
-  return "iran-hormuz";
-}
-
-function mockAIResponse(query, dossier) {
-  if (!dossier) return "Response generated.";
-  return "Drawing on <strong>" + dossier.stats.entities + " entities</strong> and <strong>" + dossier.stats.relations + " relations</strong> in the " + dossier.title + " subgraph, here is a preliminary synthesis. Expand the report on the right for the full editorial.";
+  const t = (text || "").toLowerCase();
+  if (/\b(russia|russian|ukraine|ukrainian|kyiv|kiev|moscow|putin|zelensky|donbas|crimea|wagner|nato)\b/.test(t)) return "russia-ukraine";
+  if (/\b(houthi|houthis|red\s+sea|bab|bab-el-mandeb|suez|ansar\s+allah|prosperity\s+guardian|yemen|cape\s+routing)\b/.test(t)) return "red-sea-houthis";
+  if (/\b(hormuz|gulf|persian|gcc|strait\s+of\s+hormuz|irgc|fifth\s+fleet|ukmto|kharg)\b/.test(t)) return "iran-hormuz";
+  if (/\b(iran|iranian|hezbollah|hamas|khamenei|nuclear|jcpoa|tehran|israel|proxy)\b/.test(t)) return "iran-usa";
+  if (/\b(taiwan|tsmc|formosa|pla|indopacom|taipei|strait|cross-strait|silicon\s+shield)\b/.test(t)) return "taiwan-strait";
+  if (/\b(ai|a\.i\.|artificial\s+intelligence|semiconductor|chip|lithography|asml|nvidia|tech\s+rivalry|compute|deepseek|export\s+control)\b/.test(t)) return "ai-us-china";
+  // Fallback: when the question is generic/ambiguous, pick a dossier that is
+  // likely to yield useful context. Iran-USA has the broadest actor coverage.
+  return "iran-usa";
 }
 
 function formatNow() {
