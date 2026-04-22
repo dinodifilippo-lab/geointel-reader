@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- GeoIntel Reader v2.3.3 -->
+<!-- GeoIntel Reader v2.3.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -257,7 +257,8 @@ html, body {
 .debug-panel summary::-webkit-details-marker { display: none; }
 .debug-panel summary::before { content: "▸ "; color: var(--text-4); margin-right: 4px; }
 .debug-panel[open] summary::before { content: "▾ "; }
-.debug-clear { border: 1px solid #d9d6ce; background: #ffffff; color: var(--text-3); font-family: inherit; font-size: 9.5px; padding: 2px 8px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; }
+.debug-actions { display: inline-flex; gap: 6px; align-items: center; }
+.debug-clear { border: 1px solid #d9d6ce; background: #ffffff; color: var(--text-3); font-family: inherit; font-size: 9.5px; padding: 2px 8px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; min-width: 48px; }
 .debug-clear:hover { background: var(--text-1); color: #ffffff; border-color: var(--text-1); }
 .debug-body { padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #efece4; }
 .debug-row { display: grid; grid-template-columns: 60px 170px 1fr; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #efece4; word-break: break-all; }
@@ -532,7 +533,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
 <header class="topbar">
 <a class="brand" href="#">
 <div class="brand-mark">G</div>
-<span>GeoIntel<em>·</em>Reader <span class="version">v2.3.3</span></span>
+<span>GeoIntel<em>·</em>Reader <span class="version">v2.3.4</span></span>
 </a>
 <div id="topbar-left-extra"></div>
 <div class="topbar-center" id="topbar-center"></div>

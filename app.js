@@ -1,6 +1,6 @@
-// GeoIntel Reader · app.js · v2.3.3
+// GeoIntel Reader · app.js · v2.3.4
 
-const APP_VERSION = "2.3.3";
+const APP_VERSION = "2.3.4";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -291,7 +291,12 @@ function renderDebugPanel() {
     '</div>';
   }).join("");
   return '<details class="debug-panel"' + openAttr + '>' +
-    '<summary>Debug log · ' + DEBUG_LOG.length + ' entries <button type="button" class="debug-clear" id="debug-clear">clear</button></summary>' +
+    '<summary>Debug log · ' + DEBUG_LOG.length + ' entries ' +
+      '<span class="debug-actions">' +
+        '<button type="button" class="debug-clear" id="debug-copy">copy</button>' +
+        '<button type="button" class="debug-clear" id="debug-clear">clear</button>' +
+      '</span>' +
+    '</summary>' +
     '<div class="debug-body">' + rows + '</div>' +
   '</details>';
 }
@@ -572,6 +577,44 @@ function wireCommonChrome() {
     e.stopPropagation();
     DEBUG_LOG = [];
     render();
+  });
+  // Debug-log copy button. Flattens the ring buffer to TSV so it pastes
+  // cleanly into chat / issue trackers. iOS Safari needs this because
+  // text selection inside <details> is awkward on touch.
+  const dbgCopy = document.getElementById("debug-copy");
+  if (dbgCopy) dbgCopy.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const text = DEBUG_LOG.map(function(x) {
+      return x.ts + "\t" + x.label + "\t" + x.text;
+    }).join("\n");
+    const original = dbgCopy.textContent;
+    function flash(msg) {
+      dbgCopy.textContent = msg;
+      setTimeout(function() { dbgCopy.textContent = original; }, 1500);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function() { flash("copied"); },
+        function() { flash("failed"); }
+      );
+    } else {
+      // Fallback for non-HTTPS or older WebKit contexts.
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "absolute";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        flash(ok ? "copied" : "failed");
+      } catch (err) {
+        flash("failed");
+      }
+    }
   });
   // Graph fullscreen expand + close + overlay dismiss.
   const expandBtn = document.getElementById("graph-expand-btn");
