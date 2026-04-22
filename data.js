@@ -1004,3 +1004,197 @@ graph_svg: `<defs><radialGradient id="glowTealRS" cx="50%" cy="50%"><stop offset
 
 }
 };
+
+
+window.CHESS_DATA.kg = {
+
+entities: [
+// –– Russia-Ukraine ––
+{ id: "russia",           label: "Russia",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine", "ai-us-china"] },
+{ id: "ukraine",          label: "Ukraine",             type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "usa",              label: "United States",       type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine", "iran-usa", "taiwan-strait", "ai-us-china", "red-sea-houthis"] },
+{ id: "germany",          label: "Germany",             type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "poland",           label: "Poland",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "uk",               label: "United Kingdom",      type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine", "red-sea-houthis"] },
+{ id: "france",           label: "France",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "china",            label: "China (PRC)",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["russia-ukraine", "iran-usa", "taiwan-strait", "ai-us-china"] },
+{ id: "turkey",           label: "Turkey",              type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine", "iran-usa"] },
+{ id: "india",            label: "India",               type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine"] },
+{ id: "hungary-slovakia", label: "Hungary / Slovakia",  type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "nato",             label: "NATO",                type: "actor", subtype: "alliance",  cluster: null,             dossiers: ["russia-ukraine"] },
+{ id: "belarus",          label: "Belarus",             type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "ua-grid",          label: "Ukrainian energy grid", type: "asset", subtype: "infrastructure", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "znpp",             label: "Zaporizhzhia Nuclear Plant", type: "asset", subtype: "nuclear", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "black-sea-corridor", label: "Black Sea grain corridor", type: "asset", subtype: "logistics", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "baltic-cables",    label: "Baltic subsea cables", type: "asset", subtype: "infrastructure", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+{ id: "russian-refining", label: "Russian refining capacity", type: "asset", subtype: "energy", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
+
+```
+// ---- Iran-Hormuz ----
+{ id: "iran",             label: "Iran (State)",        type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa", "red-sea-houthis"] },
+{ id: "irgc-navy",        label: "IRGC-Navy",           type: "actor", subtype: "military",  cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "us-5th-fleet",     label: "US 5th Fleet",        type: "actor", subtype: "military",  cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa"] },
+{ id: "ukmto",            label: "UKMTO",               type: "actor", subtype: "coord",     cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "gcc",              label: "GCC bloc",            type: "actor", subtype: "alliance",  cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "saudi-arabia",     label: "Saudi Arabia",        type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-usa", "red-sea-houthis"] },
+{ id: "qatar",            label: "Qatar",               type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-usa"] },
+{ id: "uae",              label: "UAE",                 type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa"] },
+{ id: "commercial-shipping", label: "Commercial shipping", type: "asset", subtype: "logistics", cluster: "middle-east", dossiers: ["iran-hormuz", "red-sea-houthis"] },
+{ id: "lloyds-market",    label: "Lloyd's insurance market", type: "asset", subtype: "finance", cluster: null,        dossiers: ["iran-hormuz", "red-sea-houthis"] },
+{ id: "hormuz",           label: "Strait of Hormuz",    type: "asset", subtype: "chokepoint", cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "kharg-terminal",   label: "Kharg Oil Terminal",  type: "asset", subtype: "energy",    cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "gulf-gnss",        label: "Gulf GNSS infrastructure", type: "asset", subtype: "infrastructure", cluster: "middle-east", dossiers: ["iran-hormuz"] },
+{ id: "ksa-eastwest-pipeline", label: "Saudi East-West Pipeline", type: "asset", subtype: "energy", cluster: "middle-east", dossiers: ["iran-hormuz", "red-sea-houthis"] },
+{ id: "uae-fujairah-bypass", label: "UAE Fujairah pipeline bypass", type: "asset", subtype: "energy", cluster: "middle-east", dossiers: ["iran-hormuz"] },
+
+// ---- Iran-USA ----
+{ id: "israel",           label: "Israel",              type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-usa", "red-sea-houthis"] },
+{ id: "hezbollah",        label: "Hezbollah",           type: "actor", subtype: "non-state", cluster: "middle-east",    dossiers: ["iran-usa"] },
+{ id: "hamas",            label: "Hamas",               type: "actor", subtype: "non-state", cluster: "middle-east",    dossiers: ["iran-usa"] },
+{ id: "houthi",           label: "Ansar Allah (Houthi)", type: "actor", subtype: "non-state", cluster: "middle-east", dossiers: ["iran-usa", "red-sea-houthis"] },
+{ id: "iraqi-militias",   label: "Iraqi militias",      type: "actor", subtype: "non-state", cluster: "middle-east",    dossiers: ["iran-usa"] },
+{ id: "e3",               label: "E3 (UK/FR/DE)",       type: "actor", subtype: "alliance",  cluster: null,             dossiers: ["iran-usa"] },
+{ id: "iran-nuclear",     label: "Iranian nuclear programme", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: ["iran-usa"] },
+{ id: "natanz",           label: "Natanz enrichment facility", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: ["iran-usa"] },
+{ id: "fordow",           label: "Fordow enrichment facility", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: ["iran-usa"] },
+{ id: "post-assad-syria", label: "Post-Assad Syria",    type: "asset", subtype: "territory", cluster: "middle-east",    dossiers: ["iran-usa"] },
+
+// ---- Taiwan Strait ----
+{ id: "pla-east",         label: "PLA Eastern Theater", type: "actor", subtype: "military",  cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "taiwan",           label: "ROC (Taiwan)",        type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "us-indopacom",     label: "US INDOPACOM",        type: "actor", subtype: "military",  cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "japan-sdf",        label: "Japan SDF",           type: "actor", subtype: "military",  cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "philippines",      label: "Philippines",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "australia",        label: "Australia",           type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "skorea",           label: "South Korea",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait", "ai-us-china"] },
+{ id: "tsmc",             label: "TSMC",                type: "asset", subtype: "corporate", cluster: "east-asia",      dossiers: ["taiwan-strait", "ai-us-china"] },
+{ id: "taiwan-subsea-cables", label: "Taiwan subsea cables", type: "asset", subtype: "infrastructure", cluster: "east-asia", dossiers: ["taiwan-strait"] },
+{ id: "us-7th-fleet",     label: "US 7th Fleet",        type: "asset", subtype: "military",  cluster: "east-asia",      dossiers: ["taiwan-strait"] },
+{ id: "rare-earths",      label: "Rare earths supply chain", type: "asset", subtype: "materials", cluster: null,       dossiers: ["taiwan-strait", "ai-us-china"] },
+{ id: "luzon-strait",     label: "Luzon Strait",        type: "asset", subtype: "chokepoint", cluster: "east-asia",     dossiers: ["taiwan-strait"] },
+
+// ---- AI US-China ----
+{ id: "us-bis",           label: "United States (BIS)", type: "actor", subtype: "gov-agency", cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "china-miit",       label: "China (MIIT)",        type: "actor", subtype: "gov-agency", cluster: "east-asia",      dossiers: ["ai-us-china"] },
+{ id: "nvidia",           label: "Nvidia",              type: "actor", subtype: "corporate",  cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "asml",             label: "ASML",                type: "actor", subtype: "corporate",  cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "huawei",           label: "Huawei",              type: "actor", subtype: "corporate",  cluster: "east-asia",      dossiers: ["ai-us-china"] },
+{ id: "smic",             label: "SMIC",                type: "actor", subtype: "corporate",  cluster: "east-asia",      dossiers: ["ai-us-china"] },
+{ id: "deepseek",         label: "DeepSeek & Chinese labs", type: "actor", subtype: "corporate", cluster: "east-asia",  dossiers: ["ai-us-china"] },
+{ id: "samsung-hynix",    label: "Samsung / SK Hynix",  type: "actor", subtype: "corporate",  cluster: "east-asia",      dossiers: ["ai-us-china"] },
+{ id: "netherlands",      label: "Netherlands",         type: "actor", subtype: "state",      cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "euv-lithography",  label: "EUV lithography",     type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "duv-lithography",  label: "Advanced DUV lithography", type: "asset", subtype: "technology", cluster: null,       dossiers: ["ai-us-china"] },
+{ id: "hbm-memory",       label: "HBM memory",          type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "frontier-models",  label: "Frontier AI models",  type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china"] },
+
+// ---- Red Sea / Houthi ----
+{ id: "prosperity-guardian", label: "Prosperity Guardian coalition", type: "actor", subtype: "alliance", cluster: "middle-east", dossiers: ["red-sea-houthis"] },
+{ id: "eu-aspides",       label: "EU Operation Aspides", type: "actor", subtype: "alliance",  cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
+{ id: "egypt",            label: "Egypt",               type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
+{ id: "bab-el-mandeb",    label: "Bab-el-Mandeb",       type: "asset", subtype: "chokepoint", cluster: "middle-east",   dossiers: ["red-sea-houthis"] },
+{ id: "suez",             label: "Suez Canal",          type: "asset", subtype: "chokepoint", cluster: "middle-east",   dossiers: ["red-sea-houthis"] },
+{ id: "europe-asia-shipping", label: "Europe-Asia shipping lanes", type: "asset", subtype: "logistics", cluster: null, dossiers: ["red-sea-houthis"] },
+{ id: "egyptian-fx",      label: "Egyptian FX reserves", type: "asset", subtype: "finance",  cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
+{ id: "hodeidah",         label: "Hodeidah port",       type: "asset", subtype: "logistics", cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
+{ id: "horn-africa-bases", label: "Horn of Africa bases", type: "asset", subtype: "military", cluster: "middle-east",   dossiers: ["red-sea-houthis"] }
+```
+
+],
+
+relations: [
+// –– Russia-Ukraine dossier ––
+{ from: "russia",    to: "ua-grid",        type: "coercive strike",       weight: 0.88, polarity: "neg",       volatility: "H",  reversibility: "L", confidence: 0.84, dossiers: ["russia-ukraine"] },
+{ from: "usa",       to: "ukraine",        type: "enabling (military aid)", weight: 0.81, polarity: "pos",     volatility: "VH", reversibility: "M", confidence: 0.79, dossiers: ["russia-ukraine"] },
+{ from: "germany",   to: "ukraine",        type: "enabling (military aid)", weight: 0.71, polarity: "pos",     volatility: "M",  reversibility: "M", confidence: 0.82, dossiers: ["russia-ukraine"] },
+{ from: "china",     to: "russia",         type: "enabling-indirect",     weight: 0.66, polarity: "neg-West",  volatility: "L",  reversibility: "L", confidence: 0.61, dossiers: ["russia-ukraine"] },
+{ from: "nato",      to: "russia",         type: "deterrent posture",     weight: 0.69, polarity: "neg",       volatility: "L",  reversibility: "M", confidence: 0.78, dossiers: ["russia-ukraine"] },
+{ from: "turkey",    to: "black-sea-corridor", type: "gatekeeping (Montreux)", weight: 0.54, polarity: "pos",  volatility: "L",  reversibility: "M", confidence: 0.83, dossiers: ["russia-ukraine"] },
+{ from: "ukraine",   to: "russian-refining", type: "reciprocal coercive",  weight: 0.61, polarity: "neg",      volatility: "H",  reversibility: "M", confidence: 0.74, dossiers: ["russia-ukraine"] },
+{ from: "russia",    to: "baltic-cables",  type: "hybrid attrition",      weight: 0.42, polarity: "neg",       volatility: "M",  reversibility: "L", confidence: 0.58, dossiers: ["russia-ukraine"] },
+{ from: "india",     to: "russia",         type: "sanctions-softening (energy)", weight: 0.38, polarity: "neg-West", volatility: "L", reversibility: "M", confidence: 0.79, dossiers: ["russia-ukraine"] },
+{ from: "hungary-slovakia", to: "nato",    type: "veto-holder (EU consensus)", weight: 0.44, polarity: "neg",   volatility: "M",  reversibility: "M", confidence: 0.81, dossiers: ["russia-ukraine"] },
+{ from: "poland",    to: "ukraine",        type: "enabling-structural (logistics)", weight: 0.57, polarity: "pos", volatility: "L", reversibility: "L", confidence: 0.85, dossiers: ["russia-ukraine"] },
+{ from: "belarus",   to: "russia",         type: "enabling-passive (territory)", weight: 0.48, polarity: "neg", volatility: "L",  reversibility: "M", confidence: 0.77, dossiers: ["russia-ukraine"] },
+{ from: "uk",        to: "ukraine",        type: "enabling (military aid)", weight: 0.58, polarity: "pos",     volatility: "M",  reversibility: "M", confidence: 0.82, dossiers: ["russia-ukraine"] },
+{ from: "france",    to: "ukraine",        type: "enabling (military aid)", weight: 0.52, polarity: "pos",     volatility: "M",  reversibility: "M", confidence: 0.78, dossiers: ["russia-ukraine"] },
+{ from: "russia",    to: "znpp",           type: "occupation (latent risk)", weight: 0.40, polarity: "neg",    volatility: "L",  reversibility: "L", confidence: 0.85, dossiers: ["russia-ukraine"] },
+
+```
+// ---- Iran-Hormuz ----
+{ from: "irgc-navy", to: "commercial-shipping", type: "coercive harassment", weight: 0.87, polarity: "neg",    volatility: "H",  reversibility: "M", confidence: 0.81, dossiers: ["iran-hormuz"] },
+{ from: "us-5th-fleet", to: "irgc-navy",   type: "deterrent presence",    weight: 0.74, polarity: "neg",       volatility: "M",  reversibility: "M", confidence: 0.80, dossiers: ["iran-hormuz"] },
+{ from: "gcc",       to: "hormuz",         type: "protective-stabilising", weight: 0.61, polarity: "pos",      volatility: "L",  reversibility: "L", confidence: 0.77, dossiers: ["iran-hormuz"] },
+{ from: "irgc-navy", to: "gulf-gnss",      type: "hybrid disruption",     weight: 0.52, polarity: "neg",       volatility: "M",  reversibility: "L", confidence: 0.64, dossiers: ["iran-hormuz"] },
+{ from: "iran",      to: "irgc-navy",      type: "command (ambiguous)",   weight: 0.58, polarity: "variable",  volatility: "M",  reversibility: "M", confidence: 0.66, dossiers: ["iran-hormuz"] },
+{ from: "lloyds-market", to: "commercial-shipping", type: "transmission (pricing)", weight: 0.68, polarity: "systemic", volatility: "M", reversibility: "M", confidence: 0.82, dossiers: ["iran-hormuz"] },
+{ from: "uae",       to: "uae-fujairah-bypass", type: "structural redundancy", weight: 0.48, polarity: "pos",  volatility: "L",  reversibility: "L", confidence: 0.85, dossiers: ["iran-hormuz"] },
+{ from: "saudi-arabia", to: "ksa-eastwest-pipeline", type: "structural redundancy", weight: 0.52, polarity: "pos", volatility: "L", reversibility: "L", confidence: 0.86, dossiers: ["iran-hormuz"] },
+{ from: "china",     to: "iran",           type: "dormant diplomatic",    weight: 0.34, polarity: "variable",  volatility: "L",  reversibility: "M", confidence: 0.52, dossiers: ["iran-hormuz", "iran-usa"] },
+
+// ---- Iran-USA ----
+{ from: "iran",      to: "iran-nuclear",   type: "latent-strategic",      weight: 0.84, polarity: "neg-West",  volatility: "L",  reversibility: "L", confidence: 0.70, dossiers: ["iran-usa"] },
+{ from: "israel",    to: "iran",           type: "coercive-preventive",   weight: 0.78, polarity: "neg",       volatility: "H",  reversibility: "L", confidence: 0.81, dossiers: ["iran-usa"] },
+{ from: "iran",      to: "hezbollah",      type: "command/support",       weight: 0.72, polarity: "variable",  volatility: "M",  reversibility: "M", confidence: 0.76, dossiers: ["iran-usa"] },
+{ from: "iran",      to: "houthi",         type: "command/support",       weight: 0.66, polarity: "variable",  volatility: "M",  reversibility: "M", confidence: 0.71, dossiers: ["iran-usa", "red-sea-houthis"] },
+{ from: "iran",      to: "iraqi-militias", type: "command/support",       weight: 0.58, polarity: "variable",  volatility: "M",  reversibility: "M", confidence: 0.73, dossiers: ["iran-usa"] },
+{ from: "iran",      to: "hamas",          type: "command/support",       weight: 0.48, polarity: "variable",  volatility: "M",  reversibility: "M", confidence: 0.70, dossiers: ["iran-usa"] },
+{ from: "usa",       to: "iran",           type: "coercive-economic (sanctions)", weight: 0.68, polarity: "neg", volatility: "L", reversibility: "M", confidence: 0.83, dossiers: ["iran-usa"] },
+{ from: "usa",       to: "iran",           type: "deterrent (military)",  weight: 0.61, polarity: "neg",       volatility: "M",  reversibility: "M", confidence: 0.75, dossiers: ["iran-usa"] },
+{ from: "qatar",     to: "usa",            type: "diplomatic back-channel", weight: 0.42, polarity: "pos",     volatility: "L",  reversibility: "M", confidence: 0.80, dossiers: ["iran-usa"] },
+{ from: "china",     to: "iran",           type: "sanctions-softening (oil)", weight: 0.54, polarity: "neg-West", volatility: "L", reversibility: "M", confidence: 0.78, dossiers: ["iran-usa"] },
+{ from: "russia",    to: "iran",           type: "enabling (diplomatic/political)", weight: 0.38, polarity: "neg-West", volatility: "M", reversibility: "M", confidence: 0.69, dossiers: ["iran-usa"] },
+{ from: "post-assad-syria", to: "iran",    type: "disabling-structural (logistics)", weight: 0.51, polarity: "neg-Iran", volatility: "L", reversibility: "L", confidence: 0.77, dossiers: ["iran-usa"] },
+{ from: "iraqi-militias", to: "usa",       type: "harassment",            weight: 0.35, polarity: "neg",       volatility: "H",  reversibility: "M", confidence: 0.71, dossiers: ["iran-usa"] },
+{ from: "hezbollah", to: "israel",         type: "coercive (rockets/missiles)", weight: 0.54, polarity: "neg", volatility: "H",  reversibility: "M", confidence: 0.78, dossiers: ["iran-usa"] },
+
+// ---- Taiwan Strait ----
+{ from: "tsmc",      to: "frontier-models", type: "systemic dependency",  weight: 0.91, polarity: "pos",       volatility: "M",  reversibility: "M", confidence: 0.87, dossiers: ["taiwan-strait", "ai-us-china"] },
+{ from: "pla-east",  to: "taiwan",         type: "coercive grey-zone",    weight: 0.83, polarity: "neg",       volatility: "H",  reversibility: "L", confidence: 0.84, dossiers: ["taiwan-strait"] },
+{ from: "us-indopacom", to: "china",       type: "deterrent posture",     weight: 0.71, polarity: "neg",       volatility: "M",  reversibility: "M", confidence: 0.78, dossiers: ["taiwan-strait"] },
+{ from: "japan-sdf", to: "taiwan",         type: "enabling-deterrent",    weight: 0.62, polarity: "pos",       volatility: "M",  reversibility: "M", confidence: 0.71, dossiers: ["taiwan-strait"] },
+{ from: "philippines", to: "taiwan",       type: "enabling (EDCA basing)", weight: 0.51, polarity: "pos",      volatility: "L",  reversibility: "L", confidence: 0.80, dossiers: ["taiwan-strait"] },
+{ from: "china",     to: "taiwan",         type: "coercive-economic",     weight: 0.58, polarity: "neg",       volatility: "M",  reversibility: "M", confidence: 0.75, dossiers: ["taiwan-strait"] },
+{ from: "china",     to: "taiwan-subsea-cables", type: "hybrid attrition", weight: 0.39, polarity: "neg",      volatility: "M",  reversibility: "L", confidence: 0.61, dossiers: ["taiwan-strait"] },
+{ from: "tsmc",      to: "usa",            type: "geographic diversification (Arizona)", weight: 0.47, polarity: "pos", volatility: "L", reversibility: "L", confidence: 0.82, dossiers: ["taiwan-strait", "ai-us-china"] },
+{ from: "china",     to: "rare-earths",    type: "coercion-latent (refining)", weight: 0.44, polarity: "neg",  volatility: "L",  reversibility: "L", confidence: 0.76, dossiers: ["taiwan-strait", "ai-us-china"] },
+{ from: "usa",       to: "taiwan",         type: "enabling (arms sales)", weight: 0.56, polarity: "pos",       volatility: "L",  reversibility: "L", confidence: 0.83, dossiers: ["taiwan-strait"] },
+{ from: "australia", to: "usa",            type: "alliance (AUKUS)",      weight: 0.48, polarity: "pos",       volatility: "L",  reversibility: "L", confidence: 0.84, dossiers: ["taiwan-strait"] },
+{ from: "us-7th-fleet", to: "luzon-strait", type: "monitoring/presence", weight: 0.56, polarity: "pos",        volatility: "L",  reversibility: "L", confidence: 0.81, dossiers: ["taiwan-strait"] },
+
+// ---- AI US-China ----
+{ from: "us-bis",    to: "china-miit",     type: "coercive-technological (export controls)", weight: 0.82, polarity: "neg-China", volatility: "M", reversibility: "L", confidence: 0.86, dossiers: ["ai-us-china"] },
+{ from: "china-miit", to: "smic",          type: "enabling-industrial (indigenisation)", weight: 0.71, polarity: "pos", volatility: "L", reversibility: "L", confidence: 0.81, dossiers: ["ai-us-china"] },
+{ from: "usa",       to: "tsmc",           type: "resilience-building (pressure)", weight: 0.58, polarity: "pos", volatility: "L", reversibility: "L", confidence: 0.79, dossiers: ["ai-us-china"] },
+{ from: "china-miit", to: "rare-earths",   type: "counter-coercive (export restrictions)", weight: 0.54, polarity: "neg-West", volatility: "L", reversibility: "L", confidence: 0.80, dossiers: ["ai-us-china"] },
+{ from: "deepseek",  to: "frontier-models", type: "capability-diffusion (open-weight)", weight: 0.48, polarity: "pos", volatility: "M", reversibility: "L", confidence: 0.73, dossiers: ["ai-us-china"] },
+{ from: "us-bis",    to: "netherlands",    type: "coalition-building (export controls)", weight: 0.62, polarity: "pos", volatility: "M", reversibility: "M", confidence: 0.77, dossiers: ["ai-us-china"] },
+{ from: "us-bis",    to: "nvidia",         type: "regulatory (chip export restrictions)", weight: 0.71, polarity: "neg-for-revenue", volatility: "M", reversibility: "M", confidence: 0.84, dossiers: ["ai-us-china"] },
+{ from: "nvidia",    to: "china",          type: "revenue-adaptive (permitted products)", weight: 0.42, polarity: "commercial", volatility: "M", reversibility: "M", confidence: 0.78, dossiers: ["ai-us-china"] },
+{ from: "asml",      to: "china",          type: "restricted (EUV ban)", weight: 0.66, polarity: "neg-China", volatility: "L", reversibility: "L", confidence: 0.88, dossiers: ["ai-us-china"] },
+{ from: "samsung-hynix", to: "china",      type: "enabling (HBM, constrained)", weight: 0.46, polarity: "variable", volatility: "M", reversibility: "M", confidence: 0.72, dossiers: ["ai-us-china"] },
+{ from: "huawei",    to: "smic",           type: "customer-strategic",    weight: 0.62, polarity: "pos",       volatility: "L",  reversibility: "L", confidence: 0.80, dossiers: ["ai-us-china"] },
+
+// ---- Red Sea / Houthi ----
+{ from: "houthi",    to: "commercial-shipping", type: "coercive (anti-shipping)", weight: 0.84, polarity: "neg", volatility: "H", reversibility: "M", confidence: 0.86, dossiers: ["red-sea-houthis"] },
+{ from: "iran",      to: "houthi",         type: "enabling-support",      weight: 0.66, polarity: "neg-indirect", volatility: "L", reversibility: "L", confidence: 0.71, dossiers: ["red-sea-houthis"] },
+{ from: "prosperity-guardian", to: "houthi", type: "interdiction + strike", weight: 0.58, polarity: "neg", volatility: "M", reversibility: "M", confidence: 0.80, dossiers: ["red-sea-houthis"] },
+{ from: "bab-el-mandeb", to: "europe-asia-shipping", type: "structural-reshaping (Cape reroute)", weight: 0.62, polarity: "neg-cost", volatility: "L", reversibility: "M", confidence: 0.84, dossiers: ["red-sea-houthis"] },
+{ from: "suez",      to: "egyptian-fx",    type: "transmission (revenue loss)", weight: 0.54, polarity: "neg", volatility: "M", reversibility: "M", confidence: 0.81, dossiers: ["red-sea-houthis"] },
+{ from: "saudi-arabia", to: "houthi",      type: "diplomatic-conservative (truce)", weight: 0.42, polarity: "pos", volatility: "L", reversibility: "L", confidence: 0.75, dossiers: ["red-sea-houthis"] },
+{ from: "eu-aspides", to: "commercial-shipping", type: "defensive-escort", weight: 0.34, polarity: "pos", volatility: "L", reversibility: "M", confidence: 0.78, dossiers: ["red-sea-houthis"] },
+{ from: "israel",    to: "hodeidah",       type: "punitive strikes",      weight: 0.28, polarity: "neg",       volatility: "M",  reversibility: "M", confidence: 0.72, dossiers: ["red-sea-houthis"] },
+{ from: "houthi",    to: "israel",         type: "coercive (missile/drone)", weight: 0.31, polarity: "neg",    volatility: "M",  reversibility: "M", confidence: 0.74, dossiers: ["red-sea-houthis"] },
+{ from: "bab-el-mandeb", to: "lloyds-market", type: "risk-pricing transmission", weight: 0.48, polarity: "systemic", volatility: "M", reversibility: "M", confidence: 0.80, dossiers: ["red-sea-houthis"] },
+
+// ---- CROSS-CLUSTER / CROSS-DOSSIER arcs (critical for multi-theatre scenarios) ----
+{ from: "russia",    to: "china",          type: "tactical alignment (non-alliance)", weight: 0.52, polarity: "neg-West", volatility: "L", reversibility: "M", confidence: 0.72, dossiers: ["russia-ukraine", "ai-us-china"] },
+{ from: "usa",       to: "china",          type: "strategic rivalry (systemic)", weight: 0.74, polarity: "neg", volatility: "M", reversibility: "L", confidence: 0.84, dossiers: ["taiwan-strait", "ai-us-china"] },
+{ from: "russia",    to: "iran",           type: "tactical alignment (drone supply, diplomatic)", weight: 0.48, polarity: "neg-West", volatility: "M", reversibility: "M", confidence: 0.74, dossiers: ["iran-usa"] },
+{ from: "usa",       to: "europe-asia-shipping", type: "coalition enforcement", weight: 0.52, polarity: "pos", volatility: "M", reversibility: "M", confidence: 0.78, dossiers: ["red-sea-houthis"] },
+{ from: "china",     to: "bab-el-mandeb",  type: "transit dependency",    weight: 0.38, polarity: "systemic",  volatility: "L",  reversibility: "L", confidence: 0.76, dossiers: ["red-sea-houthis"] },
+{ from: "ksa-eastwest-pipeline", to: "hormuz", type: "bypass redundancy", weight: 0.54, polarity: "pos",       volatility: "L",  reversibility: "L", confidence: 0.83, dossiers: ["iran-hormuz", "red-sea-houthis"] }
+```
+
+]
+};
