@@ -1,6 +1,6 @@
-// GeoIntel Reader · app.js · v2.3.0
+// GeoIntel Reader · app.js · v2.3.1
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.3.1";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ LIVE CHAT BACKEND ============
@@ -791,6 +791,14 @@ function handleChatSubmit(text) {
     current_scenario: _csReduced
   };
 
+  // v2.3.1: payload diagnostics (keep until the EarlyDrop cause is pinned).
+  console.log("PAYLOAD SIZE BYTES:", new Blob([JSON.stringify(payload)]).size);
+  console.log("PAYLOAD KEYS:", Object.keys(payload));
+  console.log("KG ENTITIES COUNT:", payload.kg && payload.kg.entities && payload.kg.entities.length);
+  console.log("KG RELATIONS COUNT:", payload.kg && payload.kg.relations && payload.kg.relations.length);
+  console.log("HISTORY LENGTH:", payload.history && payload.history.length);
+  console.log("CURRENT_SCENARIO PRESENT:", !!payload.current_scenario);
+
   // Client-side timeout. If the Edge Function hangs (e.g. a slow LLM call
   // that the runtime then EarlyDrops), we want a clear error instead of
   // an infinite loader. Matches the max wall-clock budget we assume on
@@ -808,6 +816,10 @@ function handleChatSubmit(text) {
     body: JSON.stringify(payload),
     signal: controller.signal
   }).then(function(resp) {
+    // v2.3.1: response diagnostics.
+    console.log("RESPONSE STATUS:", resp.status);
+    console.log("RESPONSE OK:", resp.ok);
+    console.log("RESPONSE HEADERS:", [...resp.headers.entries()]);
     if (!resp.ok) {
       return resp.text().then(function(errText) {
         throw new Error("HTTP " + resp.status + ": " + (errText ? errText.slice(0, 300) : resp.statusText || "no body"));
@@ -835,6 +847,8 @@ function handleChatSubmit(text) {
     handleResponse(data || {});
   }).catch(function(err) {
     clearTimeout(timeoutId);
+    // v2.3.1: verbose failure diagnostics.
+    console.error("FETCH FAILED:", err && err.name, err && err.message, err && err.stack);
     console.error("Chat error:", err);
     CHAT_IN_FLIGHT = false;
     REPORT_LOADING = false;
