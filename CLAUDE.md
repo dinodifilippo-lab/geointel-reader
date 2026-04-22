@@ -311,14 +311,14 @@ versioni correnti, feature attive e bug aperti.
 
 ### 9.1 Versioni
 
-- **Frontend**: `app.js` v2.3.3, `index.html` v2.3.3.
+- **Frontend**: `app.js` v2.3.4, `index.html` v2.3.4.
 - **Dataset**: `data.js` v2.0.0 (KG 77 entities + 77 relations, brief_text
   per 6 dossier: russia-ukraine, iran-hormuz, iran-usa, taiwan-strait,
   ai-us-china, red-sea-houthi).
 - **Edge Function** `geointel-reader-chat`: v2.2 (two-phase
-  classifier+generator). Modelli: `claude-haiku-4-5-20251001` (classifier,
-  max_tokens 800), `claude-sonnet-4-5-20250929` (generator, max_tokens
-  5000).
+  classifier+generator, non-streaming). Modelli:
+  `claude-haiku-4-5-20251001` (classifier, max_tokens 800),
+  `claude-sonnet-4-5-20250929` (generator, max_tokens 5000).
 
 ### 9.2 Feature attive lato frontend
 
@@ -347,35 +347,62 @@ versioni correnti, feature attive e bug aperti.
 9. **Fetch robustness** (v2.3.1): `AbortController` con timeout client-side
    180 s; gestione response non-ok con body text surfaced nel chat; JSON
    malformato trattato come EarlyDrop con errore visibile.
+10. **Debug log copy button** (v2.3.4): bottone `copy` a fianco di `clear`
+    nel summary del pannello debug. Serializza `DEBUG_LOG` in TSV e usa
+    `navigator.clipboard.writeText` con fallback `execCommand`. Necessario
+    su iPad dove la selezione di testo dentro `<details>` è scomoda.
 
-### 9.3 Bug aperto — EarlyDrop su UI con KG completo
+### 9.3 Bug aperto — Generator timeout (edge-proxy TTFB)
 
-**Sintomo**: dall'UI `vercel.app`, quando l'utente conferma "Procedi" dopo un
-`ready_to_generate`, la Edge Function fa shutdown con `reason: "EarlyDrop"`
-dopo **9 ms di CPU** usata. Il frontend resta appeso sul loader di
-generazione finché non scatta il timeout client (180 s).
+**Sintomo**: dall'UI `vercel.app`, il flusso scenario si interrompe
+**solo sulla seconda chiamata** (conferma "Procedi" → generator). La
+prima chiamata (classifier) va regolarmente a buon fine. Il lato
+Supabase registra `reason: "EarlyDrop"` con ~9 ms di CPU usata; il
+frontend mostra `TypeError: Load failed` dopo esattamente **30 s**.
 
-**Fatti accertati**:
+**Fatti accertati** (dal pannello debug on-screen, v2.3.3, ses. 22 apr
+17:03 UTC):
 
-- Test panel Supabase, KG minimo (5 entities + 3 relations): ✅ 200,
-  ~5–10 s, 2410 input_tokens / 1561 output_tokens.
-- Test panel Supabase, KG vuoto: ✅ 200, ~5 s, 2059 input / 747 output.
-- UI vercel.app, KG completo (77 + 77): ❌ EarlyDrop, 9 ms CPU.
-- Credito Anthropic residuo OK (~36 USD), non è billing.
-- Sonnet 4.5 disponibile, non rate-limited.
-- Bump `MAX_TOKENS_GENERATOR` da 3000 a 5000: nessun effetto sul bug UI.
+| | Turn 1 (classifier) | Turn 2 (generator) |
+|---|---|---|
+| PAYLOAD SIZE | 26.810 B | 27.195 B |
+| HISTORY LENGTH | 0 | 2 |
+| KG ENTITIES / RELATIONS | 77 / 77 | 77 / 77 |
+| RESPONSE STATUS | **200 in ~5 s** | nessuna (fetch muore a 30 s) |
+| FETCH FAILED | — | `TypeError: Load failed` |
+
+Altri fatti:
+
+- Test panel Supabase, KG minimo (5 + 3): ✅ 200, ~5–10 s.
+- Test panel Supabase, KG vuoto: ✅ 200, ~5 s.
+- Credito Anthropic OK (~36 USD). Sonnet 4.5 non rate-limited.
 - `Max duration` dell'Edge Function non esposto nel dashboard Supabase
   Settings (solo Name + Verify JWT + Invoke function).
 
-**Ipotesi corrente**: 9 ms di CPU = function terminata praticamente dopo il
-boot, prima di chiamare Anthropic. Probabile rifiuto al parsing del body
-per dimensione o shape del payload. La differenza principale tra Test
-panel (funziona) e UI (fallisce) è il KG completo serializzato (77+77 con
-tutti i campi). Non è wall-clock timeout: sarebbe comparso con CPU
-consistente.
+**Diagnosi corrente** (aggiornata dopo i log di v2.3.3):
 
-**Diagnostica in place** (commit `c35db82`, `3ca6917`, `1fed845` — tutti
-su main):
+Il bug **non è payload size** — il classifier spedisce lo stesso KG
+(77 + 77) e torna in 5 s. La vera differenza è chi risponde lato Edge
+Function: Haiku (classifier, max_tokens 800) è veloce; Sonnet
+(generator, max_tokens 5000) impiega ben più di 30 s a produrre la
+risposta completa. Il **proxy Supabase (Cloudflare-based) droppa la
+connessione quando l'Edge Function non manda response headers entro
+~30 s**. Safari, non ricevendo header, muore con `TypeError: Load
+failed` dopo il suo timeout interno. Il `reason: "EarlyDrop"` a 9 ms
+è coerente: misura solo la CPU di boot prima che la connessione
+venga recisa; il lavoro effettivo (l'await su Anthropic) non conta.
+
+**Fix prevista (non ancora implementata)**: convertire la chiamata
+Anthropic dentro l'Edge Function in **streaming** (`stream: true` lato
+SDK) e restituire al client un `ReadableStream` (SSE o chunked).
+Così gli header HTTP partono al primo token, il proxy non droppa, e
+il frontend può rifare il parsing dello streaming JSON man mano che
+arriva. Workaround temporaneo brittle: abbassare
+`MAX_TOKENS_GENERATOR` sotto la soglia che fa stare la call in <30 s
+(es. 2000 token).
+
+**Diagnostica in place** (commit `c35db82`, `3ca6917`, `1fed845`,
+`06e213b` — tutti su main):
 
 - `app.js:847–852` — pre-fetch: `PAYLOAD SIZE BYTES`, `PAYLOAD KEYS`,
   `KG ENTITIES/RELATIONS COUNT`, `HISTORY LENGTH`,
@@ -383,14 +410,15 @@ su main):
 - `app.js:876–878` — post-fetch: `RESPONSE STATUS`, `RESPONSE OK`,
   `RESPONSE HEADERS`.
 - `app.js:907–909` — catch: `FETCH FAILED name/message/stack`.
+- Pannello debug on-screen (v2.3.2) con bottone `copy` (v2.3.4) per
+  esportare in TSV e incollare altrove, leggibile da iPad senza
+  DevTools.
 
-Tutti i log vengono mirrorati al pannello debug on-screen visibile
-nell'UI (v2.3.2), leggibile da iPad senza DevTools.
-
-**Prossimo step**: leggere il pannello debug dall'UI Vercel dopo un
-tentativo di "Procedi" per capire se la fetch riceve risposta (e quale
-status) o fallisce client-side; da lì diagnosticare se il problema è
-nella dimensione del payload, nella shape, o nel routing Supabase.
+**Prossimo step**: rifattorizzare l'Edge Function `geointel-reader-chat`
+v2.2 → v2.3 introducendo streaming; adattare la `.then(resp => ...)`
+in `app.js` a leggere il `ReadableStream` invece di `resp.text()`.
+L'Edge Function source **vive solo in Supabase**, non nel repo — va
+editata dal dashboard Functions.
 
 ### 9.4 Workflow iPad — memo
 
