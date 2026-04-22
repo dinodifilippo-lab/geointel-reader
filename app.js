@@ -1,10 +1,10 @@
-// GeoIntel Reader · app.js · v1.1.0
+// GeoIntel Reader · app.js · v2.0.0
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "2.0.0";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ LIVE CHAT BACKEND ============
-// Supabase Edge Function: geointel-reader-chat
+// Supabase Edge Function: geointel-reader-chat (contract v2.0, typed responses).
 const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat";
 
 // TODO(user): paste your Supabase anon key here before deploying.
@@ -12,10 +12,19 @@ const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functio
 // It is safe to include in the frontend.
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNodXZmZGJwd2lzemp1b3lodmx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTU2NzcsImV4cCI6MjA4OTk3MTY3N30.7OAuk36xTNa6cFyF2cnpBRUtgeZpttAyi-ZA28_fhdU";
 
+// Hardcoded welcome message (Section 2 alternative: saves one API call per session).
+const WELCOME_MESSAGE = "Ciao. Questa è una demo di GeoIntel Reader. Posso costruire proiezioni di scenario su 6 aree: Russia-Ucraina, Iran (Hormuz e rivalità con USA), Taiwan, AI US-Cina, Mar Rosso-Houthi.\n\nFai una domanda di scenario. Se mancano elementi per rispondere bene, te li chiedo. Quando lo scenario è chiaro, genero report e sotto-grafo.";
+
 // Ephemeral chat state for live backend.
 let CHAT_IN_FLIGHT = false;
 let CHAT_ERROR = null;
+let REPORT_LOADING = false; // shows a loader inside the Report panel after a confirmation.
 const CHAT_HISTORY_CAP = 20;
+
+// Scenario state (spec Section 5.1).
+let currentScenario = null;    // { question, entity_ids[], relation_keys[] } | null
+let chatHistory = [];          // [{role:"user"|"assistant", content:string}]
+let lastAssistantType = null;  // type from last assistant response
 
 // ============ BASEMAP ASSET (async) ============
 let WORLD_LAND = null;
@@ -48,25 +57,17 @@ function projectToSVG(lon, lat, viewBoxWidth, viewBoxHeight) {
 const MAP_W = 1200, MAP_H = 600;
 
 // ============ ROUTING ============
+// v2.0: routes are driven by scenario state, not the URL. The hash only
+// distinguishes the Atlas "home" (default) from the scenario-populated view.
+// The populated view is shown whenever `currentScenario` is non-null OR
+// when a scenario generation is in flight (REPORT_LOADING).
 function getRoute() {
-  const h = window.location.hash.replace(/^#/, "");
-  if (!h || h === "atlas" || h === "home") return { view: "home" };
-  if (h === "atlas-full") return { view: "home" }; // legacy alias
-  const m = h.match(/^(report|dossier)\/(.+)$/);
-  if (m) {
-    const key = m[2];
-    // Numeric key → generated snapshot index
-    if (/^\d+$/.test(key) && GENERATED_REPORTS[key]) {
-      return { view: "report", dossierId: GENERATED_REPORTS[key].dossierId, reportNum: Number(key) };
-    }
-    // Dossier id fallback
-    if (CHESS_DATA.dossiers[key]) return { view: "report", dossierId: key, reportNum: null };
-  }
+  if (currentScenario || REPORT_LOADING) return { view: "scenario" };
   return { view: "home" };
 }
 
 window.addEventListener("hashchange", function() {
-  if (getRoute().view === "home") ATLAS_VIEW = { level: "world", clusterId: null };
+  if (!currentScenario && !REPORT_LOADING) ATLAS_VIEW = { level: "world", clusterId: null };
   render();
 });
 window.addEventListener("DOMContentLoaded", render);
@@ -85,21 +86,15 @@ let ATLAS_VIEW = { level: "world", clusterId: null };
 let INFO_CARD = { open: false, type: null, id: null };
 
 // ============ GLOBAL CHAT ============
-const GREETING_MSG = {
-  role: "ai",
-  time: "Now",
-  text: "Hello. Ask me about any geopolitical tension in the world — I will synthesise a dossier from the Knowledge Graph, combining entity-level analysis, arcs with polarity and volatility, and an editorial report."
-};
-let GLOBAL_CHAT = [Object.assign({}, GREETING_MSG)];
-let REPORT_COUNTER = 0; // increments on each AI response that produces a report
+// The chat UI is kept compatible with the v1 message format (role/time/text)
+// but the API wire format lives in `chatHistory` ({role, content}).
+function makeGreeting() {
+  return { role: "ai", time: "Now", text: escapeHTMLForChat(WELCOME_MESSAGE) };
+}
+let GLOBAL_CHAT = [makeGreeting()];
 
-// Generated snapshots indexed by reportNum.
-// Each: { dossierId, query, timestamp, reportNum }.
-const GENERATED_REPORTS = {};
-
-// Ephemeral UI state for populated view.
-let GRAPH_FILTER = "full"; // full | actor | asset | event
-let GRAPH_HIGHLIGHT = null; // entity name to highlight (from chip click)
+// Ephemeral UI state for populated view (kept for graph fullscreen + chip click).
+let GRAPH_HIGHLIGHT = null; // entity id (from chip click)
 
 // Archive drawer UI state.
 let ARCHIVE_OPEN = false;
@@ -112,12 +107,15 @@ let BASEMAP_LOADED = false;
 
 function newChat() {
   saveChatToArchive();
-  GLOBAL_CHAT = [Object.assign({}, GREETING_MSG)];
-  REPORT_COUNTER = 0;
-  for (const k in GENERATED_REPORTS) delete GENERATED_REPORTS[k];
+  GLOBAL_CHAT = [makeGreeting()];
+  currentScenario = null;
+  chatHistory = [];
+  lastAssistantType = null;
+  CHAT_IN_FLIGHT = false;
+  CHAT_ERROR = null;
+  REPORT_LOADING = false;
   ATLAS_VIEW = { level: "world", clusterId: null };
   INFO_CARD = { open: false, type: null, id: null };
-  GRAPH_FILTER = "full";
   GRAPH_HIGHLIGHT = null;
   ARCHIVE_OPEN = false;
   if (window.location.hash) window.location.hash = "";
@@ -143,20 +141,10 @@ function render() {
   if (!root) return;
 
   renderTopbar(route);
-
-  if (route.view === "report") {
-    const d = CHESS_DATA.dossiers[route.dossierId];
-    if (!d) {
-      window.location.hash = "";
-      return;
-    }
-    const snapshot = route.reportNum ? GENERATED_REPORTS[route.reportNum] : null;
-    root.innerHTML = renderWorkingSurfaceHTML(d, snapshot);
-    wireWorkingSurface(d);
-  } else {
-    root.innerHTML = renderWorkingSurfaceHTML(null, null);
-    wireWorkingSurface(null);
-  }
+  root.innerHTML = renderWorkingSurfaceHTML();
+  wireWorkingSurface(route.view === "scenario");
+  // After the graph SVG is in the DOM, apply the subgraph dim/highlight.
+  if (route.view === "scenario") applyScenarioHighlight();
 }
 
 // ============ TOPBAR ============
@@ -165,12 +153,12 @@ function renderTopbar(route) {
   const centerEl = document.getElementById("topbar-center");
   if (!leftEl || !centerEl) return;
 
-  if (route.view === "report") {
-    const d = CHESS_DATA.dossiers[route.dossierId];
-    leftEl.innerHTML = '<a class="back-to-atlas" href="#">← Atlas</a>';
-    centerEl.innerHTML = d
-      ? '<span class="dossier-pill">DOSSIER · ' + d.title.toUpperCase() + '</span>'
-      : '';
+  if (route.view === "scenario") {
+    leftEl.innerHTML = '<a class="back-to-atlas" href="#" id="back-to-atlas">← Atlas</a>';
+    const title = currentScenario && currentScenario.title
+      ? currentScenario.title
+      : (REPORT_LOADING ? "Generating scenario…" : "Scenario");
+    centerEl.innerHTML = '<span class="dossier-pill">SCENARIO · ' + escapeHTML(title.toUpperCase()) + '</span>';
   } else {
     leftEl.innerHTML = '';
     centerEl.innerHTML = '';
@@ -178,39 +166,40 @@ function renderTopbar(route) {
 }
 
 // ============ WORKING SURFACE ============
-function renderWorkingSurfaceHTML(dossier, snapshot) {
+function renderWorkingSurfaceHTML() {
+  const route = getRoute();
   return '<div class="working-surface">' +
     (ARCHIVE_OPEN ? renderArchiveDrawer() : '') +
-    renderChatPanel(dossier) +
+    renderChatPanel() +
     '<div class="right-area">' +
-      (dossier ? renderPopulatedRight(dossier, snapshot) : renderAmbientRight()) +
+      (route.view === "scenario" ? renderPopulatedRight() : renderAmbientRight()) +
     '</div>' +
-    (GRAPH_OVERLAY_OPEN && dossier ? renderGraphOverlay(dossier, snapshot) : '') +
+    (GRAPH_OVERLAY_OPEN && route.view === "scenario" ? renderGraphOverlay() : '') +
   '</div>';
 }
 
-function renderGraphOverlay(d, snapshot) {
-  const displayNum = snapshot ? snapshot.reportNum : d.current_report_id;
+function renderGraphOverlay() {
+  const title = currentScenario && currentScenario.title ? currentScenario.title : "Subgraph";
   return '<div class="graph-overlay" role="dialog" aria-label="Graph fullscreen">' +
     '<div class="graph-overlay-bg" data-overlay-dismiss="1"></div>' +
     '<div class="graph-overlay-box">' +
       '<div class="graph-overlay-header">' +
-        '<div class="graph-overlay-title">Graph <span class="report-num">#' + displayNum + '</span> · ' + d.title + '</div>' +
+        '<div class="graph-overlay-title">Subgraph · ' + escapeHTML(title) + '</div>' +
         '<button class="graph-overlay-close" id="graph-overlay-close" type="button" aria-label="Close">×</button>' +
       '</div>' +
       '<div class="graph-overlay-canvas">' +
-        '<svg class="graph-svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet">' + d.graph_svg + '</svg>' +
+        renderKgGraphSVG(true) +
       '</div>' +
       '<div class="graph-overlay-hint">Esc to close</div>' +
     '</div>' +
   '</div>';
 }
 
-function renderChatPanel(_dossier) {
+function renderChatPanel() {
   const count = GLOBAL_CHAT.length;
   const metaLabel = count <= 1 ? "Ready" : count + " msg · Session";
   const isEmpty = count <= 1;
-  const messagesHTML = (isEmpty ? "" : '<div class="day-sep">Today · ' + formatToday() + '</div>') +
+  const messagesHTML = '<div class="day-sep">Today · ' + formatToday() + '</div>' +
     GLOBAL_CHAT.map(renderMessage).join("");
 
   return '<aside class="chat-panel">' +
@@ -241,7 +230,7 @@ function renderChatPanel(_dossier) {
         ? '<div class="chat-loading" id="chat-loading" aria-live="polite">Analysing<span class="dots"></span></div>'
         : '') +
       '<div class="chat-input-box">' +
-        '<textarea id="chat-textarea" placeholder="Ask anything about the world\'s tensions…" rows="1"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '></textarea>' +
+        '<textarea id="chat-textarea" placeholder="Chiedi uno scenario (es. finestra migliore per un\'azione cinese su Taiwan)…" rows="1"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '></textarea>' +
         '<div class="chat-input-actions">' +
           '<button type="submit" class="send-btn" id="chat-send"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '>Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
         '</div>' +
@@ -344,65 +333,71 @@ function computeAmbientViewBox() {
   return "0 0 " + MAP_W + " " + MAP_H;
 }
 
-// ============ POPULATED RIGHT ============
-function renderPopulatedRight(d, snapshot) {
-  const r = d.reports[d.current_report_id];
-  const displayNum = snapshot ? snapshot.reportNum : d.current_report_id;
-  const displayTimestamp = snapshot ? formatSnapshotTimestamp(snapshot.timestamp) : r.timestamp;
-  const queryByline = snapshot
-    ? '<div class="snapshot-query"><span class="snapshot-query-label">Triggered by</span><span class="snapshot-query-text">"' + escapeHTML(snapshot.query) + '"</span></div>'
-    : '';
-  const filterStateAttr = ' data-graph-filter="' + GRAPH_FILTER + '"';
-  const hlAttr = GRAPH_HIGHLIGHT ? ' data-graph-highlight="' + escapeHTML(GRAPH_HIGHLIGHT) + '"' : '';
+// ============ POPULATED RIGHT (scenario-driven, v2.0) ============
+function renderPopulatedRight() {
+  const subAttr = currentScenario ? ' data-active-subgraph="1"' : '';
+  const reportBody = REPORT_LOADING
+    ? renderReportLoader()
+    : (currentScenario
+        ? renderScenarioReport(currentScenario)
+        : renderReportEmpty());
+  const reportTitle = currentScenario && currentScenario.title
+    ? '<span class="panel-title">Report · <span class="scenario-title-inline">' + escapeHTML(currentScenario.title) + '</span></span>'
+    : '<span class="panel-title">Report</span>';
   return '<div class="upper-strip">' +
-    '<section class="graph-panel"' + filterStateAttr + hlAttr + '>' +
+    '<section class="graph-panel' + (currentScenario ? ' active-subgraph' : '') + '"' + subAttr + '>' +
       '<div class="panel-header">' +
-        '<span class="panel-title">Graph <span class="report-num">#' + displayNum + '</span></span>' +
+        '<span class="panel-title">Subgraph</span>' +
         '<button class="panel-action panel-action-btn" id="graph-expand-btn" type="button" aria-label="Open graph fullscreen">Expand</button>' +
       '</div>' +
-      '<div class="graph-controls">' +
-        '<button class="graph-ctrl' + (GRAPH_FILTER === "full" ? " active" : "") + '" data-filter="full">Full</button>' +
-        '<button class="graph-ctrl' + (GRAPH_FILTER === "actor" ? " active" : "") + '" data-filter="actor">Actors</button>' +
-        '<button class="graph-ctrl' + (GRAPH_FILTER === "asset" ? " active" : "") + '" data-filter="asset">Assets</button>' +
-        '<button class="graph-ctrl' + (GRAPH_FILTER === "event" ? " active" : "") + '" data-filter="event">Events</button>' +
-      '</div>' +
       '<div class="graph-svg-wrap">' +
-        '<svg class="graph-svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid meet">' + d.graph_svg + '</svg>' +
+        renderKgGraphSVG(false) +
       '</div>' +
       '<div class="legend">' +
         '<div class="legend-item"><span class="legend-dot" style="background:#0d7a6e"></span>Actor</div>' +
         '<div class="legend-item"><span class="legend-dot" style="background:#a8570f"></span>Asset</div>' +
-        '<div class="legend-item"><span class="legend-dot" style="background:#5b21b6"></span>Event</div>' +
         '<div class="legend-item"><span class="legend-dot" style="background:#b8203a"></span>Negative arc</div>' +
         '<div class="legend-item"><span class="legend-dot" style="background:#15803d"></span>Positive arc</div>' +
       '</div>' +
     '</section>' +
     '<aside class="intel-panel">' +
       '<div class="panel-header"><span class="panel-title">Intel</span></div>' +
-      '<div class="intel-body">' + renderIntel(d.intel) + '</div>' +
+      '<div class="intel-body">' + renderIntel(computeScenarioIntel()) + '</div>' +
     '</aside>' +
   '</div>' +
   '<section class="report-panel">' +
     '<div class="panel-header">' +
-      '<span class="panel-title">Report <span class="report-num">#' + displayNum + '</span></span>' +
+      reportTitle +
       '<div class="report-header-right">' +
-        '<span class="panel-meta">' + displayTimestamp + '</span>' +
         '<button class="download-btn" title="Download report"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span>PDF</span></button>' +
       '</div>' +
     '</div>' +
-    '<div class="report-scroll">' + queryByline + renderReport(d) + '</div>' +
+    '<div class="report-scroll">' + reportBody + '</div>' +
   '</section>';
 }
 
-function formatSnapshotTimestamp(iso) {
-  try {
-    const d = new Date(iso);
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return months[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear() + " · " +
-      String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + " UTC";
-  } catch (e) {
-    return iso;
-  }
+function renderReportEmpty() {
+  return '<div class="report-empty">' +
+    '<div class="report-empty-inner">' +
+      '<div class="report-empty-title">Nessuno scenario generato</div>' +
+      '<div class="report-empty-body">Chiedi qualcosa nella chat a sinistra per generare uno scenario.</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderReportLoader() {
+  return '<div class="report-empty">' +
+    '<div class="report-empty-inner">' +
+      '<div class="report-empty-title">Generazione in corso<span class="dots"></span></div>' +
+      '<div class="report-empty-body">Sto componendo il report e isolando il sotto-grafo rilevante.</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderScenarioReport(scenario) {
+  // The backend returns report_html pre-structured with .scenario-report etc.
+  // We trust it as server-generated HTML. Wrap in the existing .report-scroll.
+  return scenario.report_html || renderReportEmpty();
 }
 
 // ============ MAP RENDERING ============
@@ -489,11 +484,10 @@ function renderOrbitalMarkers(labelScale) {
 }
 
 // ============ WIRE WORKING SURFACE ============
-function wireWorkingSurface(dossier) {
-  wireChatForm(dossier);
-  wireGraphCtrls();
+function wireWorkingSurface(isScenarioView) {
+  wireChatForm(isScenarioView);
   wireCommonChrome();
-  if (!dossier) {
+  if (!isScenarioView) {
     wireAmbientInteractions();
   }
 }
@@ -505,6 +499,14 @@ function wireCommonChrome() {
   // Archive drawer toggle.
   const archBtn = document.getElementById("archive-btn");
   if (archBtn) archBtn.addEventListener("click", function() { ARCHIVE_OPEN = !ARCHIVE_OPEN; render(); });
+  // Back-to-Atlas from the topbar: clear scenario state.
+  const backBtn = document.getElementById("back-to-atlas");
+  if (backBtn) backBtn.addEventListener("click", function(e) {
+    e.preventDefault();
+    currentScenario = null;
+    REPORT_LOADING = false;
+    render();
+  });
   // Graph fullscreen expand + close + overlay dismiss.
   const expandBtn = document.getElementById("graph-expand-btn");
   if (expandBtn) expandBtn.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = true; render(); });
@@ -517,21 +519,6 @@ function wireCommonChrome() {
   document.querySelectorAll(".download-btn").forEach(function(btn) {
     btn.addEventListener("click", function() { window.print(); });
   });
-  // Report chip navigation in the chat messages — routes to snapshot number.
-  document.querySelectorAll(".msg-link[data-report-num]").forEach(function(a) {
-    a.addEventListener("click", function(e) {
-      e.preventDefault();
-      const n = a.getAttribute("data-report-num");
-      GRAPH_FILTER = "full";
-      GRAPH_HIGHLIGHT = null;
-      window.location.hash = "report/" + n;
-    });
-  });
-  // Graph filter + chip highlight only relevant in the populated view.
-  wireGraphFilters();
-  wireChipToGraph();
-  applyGraphFilter();
-  applyGraphHighlight();
   // Archive drawer entry wiring.
   wireArchiveDrawer();
 }
@@ -593,99 +580,6 @@ function wireAmbientInteractions() {
       render();
     });
   });
-}
-
-function wireGraphCtrls() {
-  // Filter wiring now lives in wireGraphFilters (wireCommonChrome calls it).
-}
-
-// ============ GRAPH FILTERS & CHIP HIGHLIGHT ============
-function classifyGraphNodes() {
-  // Tag each .graph-node with data-type based on its inner stroke colour.
-  const panel = document.querySelector(".graph-panel");
-  if (!panel) return;
-  const nodes = panel.querySelectorAll(".graph-node");
-  nodes.forEach(function(g) {
-    if (g.hasAttribute("data-type")) return;
-    let type = "other";
-    const stroked = g.querySelector('[stroke="#0d7a6e"], [stroke="#a8570f"], [stroke="#5b21b6"]');
-    if (stroked) {
-      const col = stroked.getAttribute("stroke");
-      if (col === "#0d7a6e") type = "actor";
-      else if (col === "#a8570f") type = "asset";
-      else if (col === "#5b21b6") type = "event";
-    }
-    g.setAttribute("data-type", type);
-    const label = g.querySelector("text");
-    if (label) g.setAttribute("data-label", (label.textContent || "").trim().toUpperCase());
-  });
-}
-
-function wireGraphFilters() {
-  document.querySelectorAll(".graph-ctrl").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      const f = btn.getAttribute("data-filter") || "full";
-      GRAPH_FILTER = f;
-      btn.parentElement.querySelectorAll("button").forEach(function(b) { b.classList.remove("active"); });
-      btn.classList.add("active");
-      const panel = document.querySelector(".graph-panel");
-      if (panel) panel.setAttribute("data-graph-filter", f);
-      applyGraphFilter();
-    });
-  });
-}
-
-function applyGraphFilter() {
-  classifyGraphNodes();
-  // CSS handles the fade via [data-graph-filter] selectors.
-}
-
-function wireChipToGraph() {
-  // Chips in the report body navigate-highlight the matching graph node.
-  document.querySelectorAll(".report-body .chip").forEach(function(chip) {
-    chip.addEventListener("click", function() {
-      const name = normaliseLabel(chip.textContent);
-      if (!name) return;
-      GRAPH_HIGHLIGHT = name;
-      const panel = document.querySelector(".graph-panel");
-      if (panel) panel.setAttribute("data-graph-highlight", name);
-      applyGraphHighlight();
-      const wrap = document.querySelector(".graph-svg-wrap");
-      if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
-  });
-}
-
-function applyGraphHighlight() {
-  classifyGraphNodes();
-  const panel = document.querySelector(".graph-panel");
-  if (!panel) return;
-  const target = GRAPH_HIGHLIGHT;
-  panel.querySelectorAll(".graph-node").forEach(function(g) {
-    g.classList.remove("highlight");
-    if (!target) return;
-    const label = g.getAttribute("data-label") || "";
-    if (label && labelMatches(label, target)) {
-      g.classList.add("highlight");
-    }
-  });
-}
-
-function normaliseLabel(raw) {
-  if (!raw) return "";
-  // Strip leading bullet marks and whitespace, keep letters/digits/spaces.
-  return raw.replace(/^[●◆▲\s]+/, "").replace(/\s+/g, " ").trim().toUpperCase();
-}
-
-function labelMatches(a, b) {
-  // a and b are already uppercase. Accept exact, prefix, or first-word match.
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const ap = a.split(" ")[0];
-  const bp = b.split(" ")[0];
-  if (ap && bp && ap === bp) return true;
-  // Try substring containment both directions.
-  return a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
 }
 
 // ============ ARCHIVE DRAWER ============
@@ -796,8 +690,8 @@ function stripHTML(s) {
   return (s || "").replace(/<[^>]*>/g, "");
 }
 
-// ============ CHAT (live, backed by geointel-reader-chat Edge Function) ============
-function wireChatForm(dossier) {
+// ============ CHAT (live, v2.0 typed responses) ============
+function wireChatForm(_isScenarioView) {
   const form = document.getElementById("chat-form");
   const ta = document.getElementById("chat-textarea");
   const sendBtn = document.getElementById("chat-send");
@@ -819,76 +713,51 @@ function wireChatForm(dossier) {
     if (sendBtn && sendBtn.disabled) return;
     const text = ta.value.trim();
     if (!text) return;
-    handleChatSubmit(text, dossier);
+    handleChatSubmit(text);
   });
   const dismiss = document.getElementById("chat-error-dismiss");
   if (dismiss) dismiss.addEventListener("click", function() {
     CHAT_ERROR = null;
     render();
   });
-  // Autofocus textarea when not in flight.
   if (!CHAT_IN_FLIGHT && ta) ta.focus();
+  // Scroll to bottom of chat messages.
+  const msgs = document.getElementById("chat-messages");
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
 }
 
-function handleChatSubmit(text, _currentDossier) {
-  const targetId = dispatchQuery(text);
-  const dossier = CHESS_DATA.dossiers[targetId];
-  if (!dossier) {
-    CHAT_ERROR = "Unable to route this question to a dossier. Please rephrase.";
-    render();
-    return;
-  }
-
-  const now = formatNow();
-  REPORT_COUNTER += 1;
-  const reportNum = REPORT_COUNTER;
-
-  GENERATED_REPORTS[reportNum] = {
-    dossierId: targetId,
-    query: text,
-    timestamp: new Date().toISOString(),
-    reportNum: reportNum
-  };
-
-  // Build history BEFORE pushing the new user message (Section 3.3 of the spec).
-  // Exclude the greeting (role "ai" with no report_num) is optional; we include
-  // it because the LLM tolerates it. Cap at CHAT_HISTORY_CAP turns total.
-  const history = GLOBAL_CHAT
-    .filter(function(m) { return m && (m.role === "user" || m.role === "ai") && !m.pending; })
-    .slice(-CHAT_HISTORY_CAP)
-    .map(function(m) {
-      return {
-        role: m.role === "ai" ? "assistant" : "user",
-        content: stripHTML(m.text || "")
-      };
-    });
-
-  GLOBAL_CHAT.push({ role: "user", time: now, text: escapeHTML(text) });
-  GLOBAL_CHAT.push({
-    role: "ai",
-    time: now,
-    text: "Analysing the " + dossier.title + " subgraph",
-    pending: true,
-    report_dossier: targetId,
-    report_num: reportNum
+function buildDossierIndex() {
+  const D = (window.CHESS_DATA && window.CHESS_DATA.dossiers) || {};
+  return Object.keys(D).map(function(id) {
+    return { id: id, title: D[id].title, description: D[id].description || "" };
   });
+}
+
+function handleChatSubmit(text) {
+  const now = formatNow();
+
+  // Append user message to UI chat + API history.
+  GLOBAL_CHAT.push({ role: "user", time: now, text: escapeHTMLForChat(text) });
+  chatHistory.push({ role: "user", content: text });
+
+  // If the last assistant turn was awaiting confirmation, this message likely
+  // confirms or refines. Show a loader in the Report panel (Section 5.3).
+  const expectingGeneration = (lastAssistantType === "ready_to_generate" ||
+                               lastAssistantType === "scenario_followup");
+  if (expectingGeneration) {
+    REPORT_LOADING = true;
+  }
 
   CHAT_IN_FLIGHT = true;
   CHAT_ERROR = null;
+  render();
 
-  GRAPH_FILTER = "full";
-  GRAPH_HIGHLIGHT = null;
-  // Navigate to the new report; render() will run via hashchange.
-  const hash = "report/" + reportNum;
-  if (window.location.hash === "#" + hash) render(); else window.location.hash = hash;
-
-  // Fire the request. brief_text is sent as LLM context only; never rendered.
   const payload = {
-    dossier_id: dossier.id,
-    dossier_title: dossier.title,
-    brief_text: dossier.brief_text || "",
     question: text,
-    history: history
+    history: chatHistory.slice(-CHAT_HISTORY_CAP - 1, -1), // everything before the just-pushed user msg, capped
+    kg: (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] },
+    dossier_index: buildDossierIndex(),
+    current_scenario: currentScenario
   };
 
   fetch(GEOINTEL_CHAT_ENDPOINT, {
@@ -906,57 +775,60 @@ function handleChatSubmit(text, _currentDossier) {
     }
     return resp.json();
   }).then(function(data) {
-    const answer = (data && typeof data.answer === "string" && data.answer.trim())
-      ? data.answer
-      : "(empty response)";
-    for (let i = GLOBAL_CHAT.length - 1; i >= 0; i--) {
-      const m = GLOBAL_CHAT[i];
-      if (m.pending && m.report_num === reportNum) {
-        m.pending = false;
-        m.text = escapeHTML(answer);
-        m.time = formatNow();
-        break;
-      }
-    }
-    CHAT_IN_FLIGHT = false;
-    CHAT_ERROR = null;
-    render();
+    handleResponse(data || {});
   }).catch(function(err) {
     console.error("Chat error:", err);
-    // Spec: keep the user's question visible; remove the pending AI placeholder;
-    // show an inline dismissible error.
-    for (let i = GLOBAL_CHAT.length - 1; i >= 0; i--) {
-      const m = GLOBAL_CHAT[i];
-      if (m.pending && m.report_num === reportNum) {
-        GLOBAL_CHAT.splice(i, 1);
-        break;
-      }
-    }
-    // Also drop the generated snapshot since no answer backs it.
-    delete GENERATED_REPORTS[reportNum];
-    if (REPORT_COUNTER === reportNum) REPORT_COUNTER -= 1;
     CHAT_IN_FLIGHT = false;
+    REPORT_LOADING = false;
     CHAT_ERROR = "Unable to reach the analysis engine. Please try again.";
-    // Navigate back home since the report we were heading to does not exist.
-    if (window.location.hash === "#report/" + reportNum) {
-      window.location.hash = "";
-    } else {
-      render();
+    // Roll back the API history since the turn did not land.
+    if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") {
+      chatHistory.pop();
     }
+    render();
   });
 }
 
-function dispatchQuery(text) {
-  const t = (text || "").toLowerCase();
-  if (/\b(russia|russian|ukraine|ukrainian|kyiv|kiev|moscow|putin|zelensky|donbas|crimea|wagner|nato)\b/.test(t)) return "russia-ukraine";
-  if (/\b(houthi|houthis|red\s+sea|bab|bab-el-mandeb|suez|ansar\s+allah|prosperity\s+guardian|yemen|cape\s+routing)\b/.test(t)) return "red-sea-houthis";
-  if (/\b(hormuz|gulf|persian|gcc|strait\s+of\s+hormuz|irgc|fifth\s+fleet|ukmto|kharg)\b/.test(t)) return "iran-hormuz";
-  if (/\b(iran|iranian|hezbollah|hamas|khamenei|nuclear|jcpoa|tehran|israel|proxy)\b/.test(t)) return "iran-usa";
-  if (/\b(taiwan|tsmc|formosa|pla|indopacom|taipei|strait|cross-strait|silicon\s+shield)\b/.test(t)) return "taiwan-strait";
-  if (/\b(ai|a\.i\.|artificial\s+intelligence|semiconductor|chip|lithography|asml|nvidia|tech\s+rivalry|compute|deepseek|export\s+control)\b/.test(t)) return "ai-us-china";
-  // Fallback: when the question is generic/ambiguous, pick a dossier that is
-  // likely to yield useful context. Iran-USA has the broadest actor coverage.
-  return "iran-usa";
+// Dispatch response by `type` (spec Section 1.3).
+function handleResponse(data) {
+  const type = data.type || "clarification";
+  const message = typeof data.message === "string" ? data.message : "";
+  const now = formatNow();
+
+  CHAT_IN_FLIGHT = false;
+  lastAssistantType = type;
+
+  // Chat bubble text. For scenario, the assistant bubble stays short —
+  // the actual analysis lives in the Report panel (Section 5.3).
+  let bubbleText = message;
+  if (type === "scenario" && (!message || !message.trim())) {
+    bubbleText = "Procedo con la generazione.";
+  }
+  GLOBAL_CHAT.push({
+    role: "ai",
+    time: now,
+    text: escapeHTMLForChat(bubbleText || "(empty response)"),
+    type: type
+  });
+  // Mirror into API-level history.
+  chatHistory.push({ role: "assistant", content: bubbleText || "" });
+
+  if (type === "scenario" && data.scenario && typeof data.scenario === "object") {
+    currentScenario = {
+      question: data.scenario.question || (chatHistory.length >= 2 ? chatHistory[chatHistory.length - 2].content : ""),
+      title: data.scenario.title || "Scenario",
+      report_html: data.scenario.report_html || "",
+      entity_ids: Array.isArray(data.scenario.entity_ids) ? data.scenario.entity_ids.slice() : [],
+      relation_keys: Array.isArray(data.scenario.relation_keys) ? data.scenario.relation_keys.slice() : []
+    };
+    REPORT_LOADING = false;
+  } else {
+    // Any non-scenario type: leave currentScenario alone (follow-ups may still
+    // reference it) but clear the loader.
+    REPORT_LOADING = false;
+  }
+
+  render();
 }
 
 function formatNow() {
@@ -967,22 +839,200 @@ function formatNow() {
 }
 
 function escapeHTML(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// ============ MESSAGE / INTEL / REPORT ============
+// Escape HTML but preserve paragraph breaks for chat bubbles.
+function escapeHTMLForChat(s) {
+  return escapeHTML(s).replace(/\n/g, "<br>");
+}
+
+// ============ KG GRAPH (dynamic SVG from window.CHESS_DATA.kg) ============
+// The subgraph is laid out once by cluster affinity; positions are stable
+// across renders so that highlighting only flips opacity, not layout.
+const KG_VIEWBOX_W = 720;
+const KG_VIEWBOX_H = 360;
+const KG_CLUSTER_CENTERS = {
+  "eastern-europe": { cx: 200, cy: 90 },
+  "middle-east":    { cx: 360, cy: 260 },
+  "east-asia":      { cx: 600, cy: 130 },
+  "_unassigned":    { cx: 500, cy: 40 }   // null / trans-geographic / unmapped
+};
+let KG_LAYOUT_CACHE = null;
+
+function computeKgLayout() {
+  if (KG_LAYOUT_CACHE) return KG_LAYOUT_CACHE;
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
+  const groups = {};
+  kg.entities.forEach(function(e) {
+    const key = e.cluster && KG_CLUSTER_CENTERS[e.cluster] ? e.cluster : "_unassigned";
+    (groups[key] = groups[key] || []).push(e);
+  });
+  const positions = {};
+  Object.keys(groups).forEach(function(key) {
+    const center = KG_CLUSTER_CENTERS[key] || KG_CLUSTER_CENTERS._unassigned;
+    const arr = groups[key];
+    // Sort actors before assets so that highlighted colours stack predictably.
+    arr.sort(function(a, b) {
+      if (a.type === b.type) return a.id.localeCompare(b.id);
+      return a.type === "actor" ? -1 : 1;
+    });
+    const n = arr.length;
+    const radius = 46 + Math.min(28, n * 1.6);
+    for (let i = 0; i < n; i++) {
+      const theta = (i / n) * Math.PI * 2 - Math.PI / 2;
+      positions[arr[i].id] = {
+        cx: +(center.cx + Math.cos(theta) * radius).toFixed(1),
+        cy: +(center.cy + Math.sin(theta) * radius * 0.68).toFixed(1),
+        entity: arr[i]
+      };
+    }
+  });
+  KG_LAYOUT_CACHE = positions;
+  return positions;
+}
+
+function renderKgGraphSVG(fullscreen) {
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
+  const pos = computeKgLayout();
+  const arcs = kg.relations.map(function(r) {
+    const a = pos[r.from], b = pos[r.to];
+    if (!a || !b) return "";
+    const key = r.from + "|" + r.to + "|" + r.type;
+    const stroke = arcStroke(r.polarity);
+    // Curve slightly so parallel arcs don't overlap.
+    const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2;
+    const dx = b.cx - a.cx, dy = b.cy - a.cy;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const off = Math.min(28, len * 0.12);
+    const cpx = mx + (-dy / len) * off;
+    const cpy = my + (dx / len) * off;
+    const d = "M " + a.cx.toFixed(1) + " " + a.cy.toFixed(1) +
+              " Q " + cpx.toFixed(1) + " " + cpy.toFixed(1) +
+              " " + b.cx.toFixed(1) + " " + b.cy.toFixed(1);
+    const sw = (1 + Math.max(0, Math.min(3, (r.weight || 0) * 3))).toFixed(1);
+    return '<path class="kg-arc" data-relation-key="' + escapeHTML(key) + '"' +
+      ' d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"' +
+      ' stroke-opacity="0.85" stroke-linecap="round"/>';
+  }).join("");
+  const nodes = Object.keys(pos).map(function(id) {
+    const p = pos[id];
+    const e = p.entity;
+    const fill = e.type === "asset" ? "#a8570f" : "#0d7a6e";
+    const r = e.type === "asset" ? 7 : 8;
+    const showLabel = fullscreen || (e.type === "actor");
+    const labelY = (p.cy + r + 10).toFixed(1);
+    const label = showLabel
+      ? '<text class="kg-label" x="' + p.cx.toFixed(1) + '" y="' + labelY + '" text-anchor="middle">' + escapeHTML(e.label) + '</text>'
+      : "";
+    return '<g class="kg-node" data-node-id="' + escapeHTML(id) + '" data-type="' + e.type + '">' +
+      '<circle cx="' + p.cx.toFixed(1) + '" cy="' + p.cy.toFixed(1) + '" r="' + r + '" fill="' + fill + '" stroke="#ffffff" stroke-width="1.5"/>' +
+      label +
+    '</g>';
+  }).join("");
+  return '<svg class="graph-svg kg-graph" viewBox="0 0 ' + KG_VIEWBOX_W + ' ' + KG_VIEWBOX_H + '" preserveAspectRatio="xMidYMid meet">' +
+    '<g class="kg-arcs">' + arcs + '</g>' +
+    '<g class="kg-nodes">' + nodes + '</g>' +
+  '</svg>';
+}
+
+function arcStroke(polarity) {
+  if (!polarity) return "#9e9b94";
+  if (polarity === "pos") return "#15803d";
+  if (polarity === "neg") return "#b8203a";
+  if (polarity.indexOf("neg") === 0) return "#c4602a";   // neg-West, neg-China, neg-cost, neg-indirect…
+  if (polarity === "systemic") return "#5b21b6";
+  return "#9e9b94"; // variable / commercial / unknown
+}
+
+function applyScenarioHighlight() {
+  document.querySelectorAll(".graph-panel").forEach(function(panel) {
+    panel.classList.remove("active-subgraph");
+    panel.querySelectorAll(".kg-node.highlighted, .kg-arc.highlighted").forEach(function(el) {
+      el.classList.remove("highlighted");
+    });
+    if (!currentScenario) return;
+    panel.classList.add("active-subgraph");
+    const ids = new Set(currentScenario.entity_ids || []);
+    const keys = new Set(currentScenario.relation_keys || []);
+    panel.querySelectorAll(".kg-node").forEach(function(n) {
+      if (ids.has(n.getAttribute("data-node-id"))) n.classList.add("highlighted");
+    });
+    panel.querySelectorAll(".kg-arc").forEach(function(a) {
+      if (keys.has(a.getAttribute("data-relation-key"))) a.classList.add("highlighted");
+    });
+  });
+  // Mirror the highlight in the fullscreen overlay (if open).
+  document.querySelectorAll(".graph-overlay .kg-graph").forEach(function(svg) {
+    svg.parentElement.classList.add("active-subgraph");
+    if (!currentScenario) return;
+    const ids = new Set(currentScenario.entity_ids || []);
+    const keys = new Set(currentScenario.relation_keys || []);
+    svg.querySelectorAll(".kg-node").forEach(function(n) {
+      n.classList.toggle("highlighted", ids.has(n.getAttribute("data-node-id")));
+    });
+    svg.querySelectorAll(".kg-arc").forEach(function(a) {
+      a.classList.toggle("highlighted", keys.has(a.getAttribute("data-relation-key")));
+    });
+  });
+}
+
+// Derive a minimal Intel panel payload from the active scenario.
+function computeScenarioIntel() {
+  if (!currentScenario) {
+    return {
+      confidence: { value: 0.0, label: "No scenario", note: "Ask a question to populate." },
+      top_arcs: [],
+      events: []
+    };
+  }
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
+  const relByKey = {};
+  kg.relations.forEach(function(r) { relByKey[r.from + "|" + r.to + "|" + r.type] = r; });
+  const picked = (currentScenario.relation_keys || [])
+    .map(function(k) { return relByKey[k]; })
+    .filter(Boolean);
+  const avgConf = picked.length
+    ? picked.reduce(function(s, r) { return s + (r.confidence || 0); }, 0) / picked.length
+    : 0;
+  const label = avgConf >= 0.8 ? "High confidence"
+    : avgConf >= 0.65 ? "Moderate-high confidence"
+    : avgConf > 0 ? "Moderate confidence" : "—";
+  const note = picked.length
+    ? "Averaged over " + picked.length + " arc(s) in the highlighted subgraph."
+    : "No arcs matched in the current scenario.";
+  const idLabel = {};
+  kg.entities.forEach(function(e) { idLabel[e.id] = e.label; });
+  const topArcs = picked
+    .slice()
+    .sort(function(a, b) { return (b.weight * (b.confidence || 0)) - (a.weight * (a.confidence || 0)); })
+    .slice(0, 5)
+    .map(function(r) {
+      return {
+        from: idLabel[r.from] || r.from,
+        to: idLabel[r.to] || r.to,
+        type: r.type,
+        weight: r.weight || 0,
+        polarity: (r.polarity && r.polarity.indexOf("pos") === 0) ? "pos" : "neg",
+        volatility: r.volatility || "—"
+      };
+    });
+  return {
+    confidence: { value: avgConf, label: label, note: note },
+    top_arcs: topArcs,
+    events: []
+  };
+}
+
+// ============ MESSAGE / INTEL ============
 function renderMessage(m) {
   if (m.role === "user") {
     return '<div class="msg user"><div class="msg-bubble">' + m.text + '</div><div class="msg-time">' + m.time + '</div></div>';
   }
-  let reportLink = "";
-  if (!m.pending && m.report_num) {
-    reportLink = '<a class="msg-link" data-report-num="' + m.report_num + '" href="#report/' + m.report_num + '">↗ Report #' + m.report_num + ' →</a>';
-  } else if (m.report_id) {
-    reportLink = '<a class="msg-link">↗ Report #' + m.report_id + ' →</a>';
-  }
-  const dots = m.pending ? '<span class="dots"></span>' : "";
-  return '<div class="msg ai ' + (m.pending ? "pending" : "") + '"><div class="msg-bubble">' + m.text + dots + '</div>' + reportLink + '<div class="msg-time">' + m.time + '</div></div>';
+  const typeTag = m.type && m.type !== "welcome"
+    ? '<div class="msg-type-tag">' + m.type.replace(/_/g, " ") + '</div>'
+    : '';
+  return '<div class="msg ai"><div class="msg-bubble">' + m.text + '</div>' + typeTag + '<div class="msg-time">' + m.time + '</div></div>';
 }
 
 function renderIntel(intel) {
@@ -1002,12 +1052,8 @@ function renderIntel(intel) {
     '</div>';
   }).join("");
 
-  const eventsHTML = intel.events.map(function(e) {
-    return '<div class="tl-item ' + (e.active ? "active" : "") + '"><div class="tl-date">' + e.date + '</div><div class="tl-title">' + e.title + '</div></div>';
-  }).join("");
-
   return '<div class="intel-section">' +
-    '<div class="intel-header"><span class="intel-sec-title">Confidence</span><span class="panel-action">Breakdown</span></div>' +
+    '<div class="intel-header"><span class="intel-sec-title">Confidence</span></div>' +
     '<div class="confidence-block">' +
       '<div class="gauge">' +
         '<svg width="58" height="58" viewBox="0 0 58 58">' +
@@ -1019,40 +1065,10 @@ function renderIntel(intel) {
       '<div class="confidence-meta"><div class="big">' + C.label + '</div><div class="small">' + C.note + '</div></div>' +
     '</div>' +
   '</div>' +
-  '<div class="intel-section">' +
-    '<div class="intel-header"><span class="intel-sec-title">Top arcs</span><span class="panel-action">All 28</span></div>' +
-    '<div class="arc-list">' + arcsHTML + '</div>' +
-  '</div>' +
-  '<div class="intel-section">' +
-    '<div class="intel-header"><span class="intel-sec-title">Recent events</span><span class="panel-action">Timeline →</span></div>' +
-    '<div class="timeline">' + eventsHTML + '</div>' +
-  '</div>';
-}
-
-function renderReport(d) {
-  const r = d.reports[d.current_report_id];
-  const sourcesHTML = r.sources.map(function(s) {
-    return '<div class="source-item"><div class="source-num">[' + s.num + ']</div><div><div class="source-title">' + s.title + '</div><div class="source-meta">' + s.meta + '</div></div><div class="source-date">' + s.date + '</div></div>';
-  }).join("");
-
-  return '<article class="report">' +
-    '<h1 class="report-title">' + r.title + '</h1>' +
-    '<p class="report-subtitle">' + r.subtitle + '</p>' +
-    '<div class="byline">' +
-      '<div class="byline-item"><span class="label">Dossier</span><span class="value">' + d.title + '</span></div>' +
-      '<div class="byline-item"><span class="label">Nodes</span><span class="value teal">' + d.stats.entities + ' entities</span></div>' +
-      '<div class="byline-item"><span class="label">Arcs</span><span class="value teal">' + d.stats.relations + ' relations</span></div>' +
-      '<div class="byline-item"><span class="label">Corpus</span><span class="value">' + d.stats.corpus + ' articles</span></div>' +
-      '<div class="byline-item"><span class="label">Sources</span><span class="value">' + d.stats.sources + ' think tanks</span></div>' +
-    '</div>' +
-    '<div class="exec-summary">' +
-      '<div class="exec-label">Executive Summary</div>' +
-      '<div class="exec-text">' + r.executive_summary + '</div>' +
-    '</div>' +
-    '<div class="report-body">' + r.body_html + '</div>' +
-    '<div class="sources">' +
-      '<div class="sources-label">Sources cited · ' + r.sources.length + ' of ' + d.stats.corpus + '</div>' +
-      sourcesHTML +
-    '</div>' +
-  '</article>';
+  (arcsHTML
+    ? '<div class="intel-section">' +
+        '<div class="intel-header"><span class="intel-sec-title">Top arcs</span><span class="panel-meta">' + intel.top_arcs.length + '</span></div>' +
+        '<div class="arc-list">' + arcsHTML + '</div>' +
+      '</div>'
+    : '');
 }

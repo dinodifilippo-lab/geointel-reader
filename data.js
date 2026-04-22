@@ -1029,7 +1029,6 @@ entities: [
 { id: "baltic-cables",    label: "Baltic subsea cables", type: "asset", subtype: "infrastructure", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
 { id: "russian-refining", label: "Russian refining capacity", type: "asset", subtype: "energy", cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
 
-```
 // ---- Iran-Hormuz ----
 { id: "iran",             label: "Iran (State)",        type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa", "red-sea-houthis"] },
 { id: "irgc-navy",        label: "IRGC-Navy",           type: "actor", subtype: "military",  cluster: "middle-east",    dossiers: ["iran-hormuz"] },
@@ -1098,7 +1097,6 @@ entities: [
 { id: "egyptian-fx",      label: "Egyptian FX reserves", type: "asset", subtype: "finance",  cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
 { id: "hodeidah",         label: "Hodeidah port",       type: "asset", subtype: "logistics", cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
 { id: "horn-africa-bases", label: "Horn of Africa bases", type: "asset", subtype: "military", cluster: "middle-east",   dossiers: ["red-sea-houthis"] }
-```
 
 ],
 
@@ -1120,7 +1118,6 @@ relations: [
 { from: "france",    to: "ukraine",        type: "enabling (military aid)", weight: 0.52, polarity: "pos",     volatility: "M",  reversibility: "M", confidence: 0.78, dossiers: ["russia-ukraine"] },
 { from: "russia",    to: "znpp",           type: "occupation (latent risk)", weight: 0.40, polarity: "neg",    volatility: "L",  reversibility: "L", confidence: 0.85, dossiers: ["russia-ukraine"] },
 
-```
 // ---- Iran-Hormuz ----
 { from: "irgc-navy", to: "commercial-shipping", type: "coercive harassment", weight: 0.87, polarity: "neg",    volatility: "H",  reversibility: "M", confidence: 0.81, dossiers: ["iran-hormuz"] },
 { from: "us-5th-fleet", to: "irgc-navy",   type: "deterrent presence",    weight: 0.74, polarity: "neg",       volatility: "M",  reversibility: "M", confidence: 0.80, dossiers: ["iran-hormuz"] },
@@ -1194,7 +1191,6 @@ relations: [
 { from: "usa",       to: "europe-asia-shipping", type: "coalition enforcement", weight: 0.52, polarity: "pos", volatility: "M", reversibility: "M", confidence: 0.78, dossiers: ["red-sea-houthis"] },
 { from: "china",     to: "bab-el-mandeb",  type: "transit dependency",    weight: 0.38, polarity: "systemic",  volatility: "L",  reversibility: "L", confidence: 0.76, dossiers: ["red-sea-houthis"] },
 { from: "ksa-eastwest-pipeline", to: "hormuz", type: "bypass redundancy", weight: 0.54, polarity: "pos",       volatility: "L",  reversibility: "L", confidence: 0.83, dossiers: ["iran-hormuz", "red-sea-houthis"] }
-```
 
 ]
 };
