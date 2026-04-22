@@ -1,317 +1,226 @@
 # GeoIntel Reader - Frontend Update Spec
 
-## For Claude Code - v2.2 (scenario history, cleaner subgraph, richer PDF)
+## For Claude Code - v2.3 (graph fixes + evidence strength unification + question rendering)
 
 ——
 
 ## TL;DR
 
-Iteration on v2.0 (scenario projection). Four targeted changes:
+Iteration on v2.2. Five frontend fixes:
 
-1. Multi-scenario history in chat: after each generation, append a clickable card in the chat. Clicking re-renders that scenario (Report + subgraph) without calling the backend again.
-1. Subgraph isolation: entities and relations not in the current scenario are HIDDEN (display:none), not just dimmed.
-1. PDF export includes a snapshot of the currently highlighted subgraph, placed after the Report body.
-1. The backend now returns likelihood_label, likelihood_range, evidence_strength. Render these in the top of the report (the generator already produces the HTML with the new headline block).
+1. Every node in the graph (and subgraph) MUST have a visible label. Some nodes currently render without one.
+1. Expand on the graph panel must preserve the subgraph filter (currently expand shows the full graph regardless of active scenario).
+1. Evidence strength: unify naming and source. Remove the “Confidence” widget from the Intel panel. Display “Evidence strength” only, computed client-side, in BOTH the Report headline block AND the Intel panel. Same number in both places.
+1. Render the user original question inside the Report (the backend now returns it as user_question and emits a blockquote in report_html, but you also need CSS for the new blockquote class).
+1. Subgraph readability: when a scenario is active, recompute the layout for the highlighted subgraph using a force-directed approach so nodes and arcs do not overlap. The full-graph (Atlas / no-scenario) layout remains as today.
 
-No changes to Atlas, no changes to the welcome message, no changes to data.js, no changes to the cluster map.
-
-——
-
-## Section 1 - New Edge Function response fields (v2.1)
-
-The response shape is unchanged at the top level. New fields live INSIDE scenario.report_html as a headline block rendered by the generator. You do not need to touch them; the HTML arrives ready.
-
-What you need is to ADD CSS for the new headline block:
-
-```css
-.scenario-report .scenario-headline {
-  display: flex;
-  gap: 2rem;
-  padding: 0.75rem 0;
-  margin: 0.5rem 0 1.25rem 0;
-  border-top: 1px solid var(—border, #e0ddd3);
-  border-bottom: 1px solid var(—border, #e0ddd3);
-}
-.scenario-report .headline-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-.scenario-report .headline-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(—muted, #888);
-  font-weight: 600;
-}
-.scenario-report .headline-value {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(—accent, #0d7a6e);
-}
-.scenario-report .headline-range {
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: var(—muted, #888);
-  margin-left: 0.35rem;
-}
-```
-
-Add this block alongside the existing scenario-report CSS you already have.
+No changes to data.js. No changes to Edge Function (already deployed v2.2).
 
 ——
 
-## Section 2 - Scenario history in chat
+## Section 1 - New Edge Function response shape (v2.2)
 
-### 2.1 State change
+The response now includes:
 
-Replace the current single-state `currentScenario` with an array:
+- `scenario.user_question` (string): the user original question verbatim, in the language they typed it
+- `scenario.report_html` includes a new blockquote with class `scenario-question` rendering the question inline
+
+The field `evidence_strength` is NO LONGER in the backend response. You compute it entirely client-side as the mean of the `confidence` field of the relations in `relation_keys`, rounded to 2 decimals.
+
+Insert the computed value into the headline block of the rendered report. The backend emits the headline block with Likelihood only; you must inject Evidence strength as a sibling `.headline-item` after rendering.
+
+Pseudo-code:
 
 ```javascript
-let scenarioHistory = [];  // array of { id, title, question, report_html, entity_ids, relation_keys, created_at }
-let currentScenarioIndex = -1;  // index of the scenario currently rendered, -1 if none
+function computeEvidenceStrength(relationKeys, kgRelations) {
+  if (!relationKeys || relationKeys.length === 0) return null;
+  const confs = relationKeys.map(key => {
+    const rel = kgRelations.find(r => `${r.from}|${r.to}|${r.type}` === key);
+    return rel ? rel.confidence : null;
+  }).filter(c => c !== null);
+  if (confs.length === 0) return null;
+  const mean = confs.reduce((a,b) => a+b, 0) / confs.length;
+  return Math.round(mean * 100) / 100;
+}
+
+function evidenceStrengthLabel(value) {
+  if (value < 0.55) return “weak”;
+  if (value < 0.70) return “moderate”;
+  if (value < 0.80) return “moderate-high”;
+  return “high”;
+}
 ```
 
-When a `type: “scenario”` response arrives:
-
-1. Create a new scenario object with a unique id (timestamp is fine), the title, the question that generated it, the report HTML, the entity_ids, the relation_keys, and created_at.
-1. Push to `scenarioHistory`.
-1. Set `currentScenarioIndex = scenarioHistory.length - 1`.
-1. Render it (Report panel + subgraph, as before).
-
-On “New chat”: clear `scenarioHistory = []`, reset `currentScenarioIndex = -1`, empty Report panel, restore full graph.
-
-### 2.2 Chat card for each scenario
-
-When a scenario is generated, after the short confirmation assistant bubble (“Procedo con la generazione.”), append a SECOND element to the chat: a clickable “scenario card”.
-
-HTML shape (add to chat message flow):
+After injecting the report_html into the Report panel, find the `.scenario-headline` element and append:
 
 ```html
-<div class=“scenario-card” data-scenario-id=“[id]”>
-  <div class=“scenario-card-label”>SCENARIO GENERATED</div>
-  <div class=“scenario-card-title”>[title from response]</div>
-  <div class=“scenario-card-hint”>Tap to recall this scenario</div>
+<div class=“headline-item”>
+  <span class=“headline-label”>Evidence strength</span>
+  <span class=“headline-value”>[value] <span class=“headline-range”>[label]</span></span>
 </div>
 ```
 
-CSS:
+CSS for the question blockquote (add to existing scenario-report CSS):
 
 ```css
-.scenario-card {
-  margin: 0.5rem 0;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(—accent, #0d7a6e);
-  border-radius: 6px;
+.scenario-report .scenario-question {
+  margin: 1rem 0 1.25rem 0;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid var(—accent, #0d7a6e);
   background: rgba(13, 122, 110, 0.04);
-  cursor: pointer;
-  transition: background 120ms ease;
+  font-style: italic;
+  color: var(—text, #1a1a1a);
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
-.scenario-card:hover {
-  background: rgba(13, 122, 110, 0.08);
-}
-.scenario-card-label {
+.scenario-report .scenario-question .question-label {
+  display: block;
+  font-style: normal;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.1em;
-  color: var(—accent, #0d7a6e);
   text-transform: uppercase;
-  margin-bottom: 0.25rem;
-}
-.scenario-card-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(—text, #1a1a1a);
-  line-height: 1.3;
-  margin-bottom: 0.2rem;
-}
-.scenario-card-hint {
-  font-size: 0.75rem;
-  color: var(—muted, #888);
-  font-style: italic;
-}
-.scenario-card.active {
-  background: rgba(13, 122, 110, 0.12);
-  border-width: 2px;
+  color: var(—accent, #0d7a6e);
+  margin-bottom: 0.3rem;
 }
 ```
 
-### 2.3 Click behaviour on the card
+——
 
-On click:
+## Section 2 - Intel panel: replace Confidence with Evidence strength
 
-1. Find the scenario in `scenarioHistory` by its `data-scenario-id`.
-1. Set `currentScenarioIndex` to that scenario’s index.
-1. Re-render Report panel with that scenario’s `report_html`.
-1. Re-highlight graph with that scenario’s `entity_ids` and `relation_keys`.
-1. Remove `.active` class from all scenario cards, add it to the clicked one.
-1. Do NOT call the backend. Purely client-side recall.
+The Intel panel currently shows a “Confidence” widget (e.g., “0.79 - Moderate-high confidence - Averaged over 12 arc(s)”). Rename and recompute:
 
-When a new scenario is generated, it becomes the active card. Previously active card loses `.active`.
+- Label: “Evidence strength” (not “Confidence”)
+- Value: same number as in the Report headline block (use the same `computeEvidenceStrength` function output)
+- Description: “[label] - Mean confidence across [N] arcs in this scenario”
+- Same visual style (gauge or number + caption)
 
-### 2.4 current_scenario in request payload
+This guarantees the Report and Intel show the same number. No more drift.
 
-The Edge Function still expects a `current_scenario` field in the POST payload (for follow-ups). Pass the currently rendered one, i.e., `scenarioHistory[currentScenarioIndex]` reduced to `{ question, entity_ids, relation_keys }`, or `null` if `currentScenarioIndex === -1`.
+When no scenario is active, the Intel panel shows a placeholder: “Generate a scenario to see evidence strength.”
 
 ——
 
-## Section 3 - Subgraph isolation (hide, not dim)
+## Section 3 - Node labels: every node must have a label
 
-Currently the subgraph highlight dims non-highlighted elements to 25% opacity. Change this to fully hide them.
+Bug: in the current rendering, some nodes appear as colored circles without a text label. All nodes must have a label visible at all times.
 
-Update the CSS you already added for `.active-subgraph`:
+Fix: in the graph render function, for every node in `window.CHESS_DATA.kg.entities`, render both:
 
-```css
-/* BEFORE (current) */
-.graph-panel.active-subgraph [data-node-id]:not(.highlighted),
-.graph-panel.active-subgraph [data-relation-key]:not(.highlighted) {
-  opacity: 0.25;
-}
+- the circle/marker
+- the label (using `entity.name` or the human-readable field used today)
 
-/* AFTER (new) */
-.graph-panel.active-subgraph [data-node-id]:not(.highlighted),
-.graph-panel.active-subgraph [data-relation-key]:not(.highlighted) {
-  display: none;
-}
-```
+If labels are positioned outside the circle (offset), make sure the offset is computed even for nodes that currently lack one. If certain nodes are excluded from labeling because of a filter, remove that filter for entities present in the graph render set.
 
-Also hide labels and any decorations tied to hidden nodes (orphan labels would float otherwise). If your graph renders labels as children of node groups, `display: none` on the parent group handles it. If labels are separate elements, give them matching `data-node-id` attributes and include them in the selector.
-
-On “New chat” or when `scenarioHistory` becomes empty, the `.active-subgraph` class is removed and everything reappears.
+Verify in console: after page load, count `<text>` elements vs node count - they should match.
 
 ——
 
-## Section 4 - PDF export with graph snapshot
+## Section 4 - Expand preserves subgraph
 
-Current behaviour: PDF export exports the Report panel content only.
+Bug: tapping “Expand” on the graph panel shows the full graph, ignoring the current `active-subgraph` filter.
 
-New behaviour: PDF export produces a document containing:
+Fix: the Expand action should:
 
-1. The Report panel body (as today)
-1. A page break
-1. A page titled “Subgraph” containing a snapshot of the currently highlighted graph
+1. Open the expanded view of the graph panel (whatever it does today: modal, fullscreen, etc.)
+1. Apply the same `.active-subgraph` class on the expanded container if a scenario is currently active
+1. Apply the same `data-node-id` / `data-relation-key` selection logic in the expanded view
 
-### 4.1 Implementation approach
+If the expanded view re-renders the graph from scratch, pass the current `currentScenarioIndex` and re-apply the filter on render.
 
-Use html2canvas (or equivalent) to capture the graph panel’s SVG as a PNG, then include that image in the html2pdf pipeline.
+When the user is in Atlas mode (no scenario active), Expand shows the full graph as today.
+
+——
+
+## Section 5 - Subgraph layout: force-directed when scenario is active
+
+Current behavior: the graph uses geographic / hardcoded positions for all nodes. When a subgraph is filtered, the highlighted nodes stay in their original positions, leaving them sometimes overlapping or crowded.
+
+New behavior: when a scenario is active and the subgraph filter is on, recompute the positions of the highlighted nodes using a force-directed simulation (d3-force or equivalent), constrained to the visible viewport of the graph panel. The full-graph layout (no scenario) remains unchanged.
+
+### Implementation
+
+Use d3-force (already shipped if d3 is in the project). Add to the graph render function:
 
 ```javascript
-async function exportScenarioPdf() {
-  if (currentScenarioIndex < 0) return;
-  const scenario = scenarioHistory[currentScenarioIndex];
+function applyForceLayoutToSubgraph(highlightedEntities, highlightedRelations, viewport) {
+  const nodes = highlightedEntities.map(e => ({ id: e.id, name: e.name, ...e }));
+  const links = highlightedRelations.map(r => ({ source: r.from, target: r.to, ...r }));
 
-  // 1. Snapshot the graph
-  const graphEl = document.querySelector(“.graph-panel”);
-  const graphCanvas = await html2canvas(graphEl, {
-    backgroundColor: “#ffffff”,
-    scale: 2,
-    logging: false,
-  });
-  const graphPng = graphCanvas.toDataURL(“image/png”);
+  const sim = d3.forceSimulation(nodes)
+    .force(“link”, d3.forceLink(links).id(d => d.id).distance(120).strength(0.6))
+    .force(“charge”, d3.forceManyBody().strength(-400))
+    .force(“center”, d3.forceCenter(viewport.width / 2, viewport.height / 2))
+    .force(“collision”, d3.forceCollide().radius(40))
+    .stop();
 
-  // 2. Build the composite HTML for the PDF
-  const reportBody = document.querySelector(“.scenario-report”).outerHTML;
-  const composite = `
-    <div class=“pdf-section”>${reportBody}</div>
-    <div class=“pdf-page-break”></div>
-    <div class=“pdf-section”>
-      <h2 class=“pdf-section-title”>Subgraph</h2>
-      <p class=“pdf-section-sub”>Entities and relations highlighted in this scenario.</p>
-      <img src=“${graphPng}” style=“width:100%; height:auto;” />
-    </div>
-  `;
+  // Run synchronously for ~300 ticks so layout settles before render
+  for (let i = 0; i < 300; i++) sim.tick();
 
-  // 3. Wrap and hand to html2pdf
-  const wrapper = document.createElement(“div”);
-  wrapper.innerHTML = composite;
-  wrapper.style.padding = “20px”;
-  wrapper.style.fontFamily = “’EB Garamond’, Georgia, serif”;
-
-  html2pdf().from(wrapper).set({
-    margin: [10, 10, 10, 10],
-    filename: `geointel-scenario-${scenario.id}.pdf`,
-    pagebreak: { mode: [“css”, “legacy”] },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: “mm”, format: “a4”, orientation: “portrait” },
-  }).save();
+  return { nodes, links };
 }
 ```
 
-CSS for page break:
+Then in the render:
 
-```css
-.pdf-page-break {
-  page-break-after: always;
-  break-after: page;
-}
-.pdf-section-title {
-  margin-top: 0;
-}
-```
+- If `currentScenarioIndex >= 0` AND the rendering target is the subgraph:
+  - Call `applyForceLayoutToSubgraph` to compute new positions
+  - Render nodes and arcs using these positions
+  - Hide all non-highlighted nodes and arcs (already today via display:none)
+- Else:
+  - Use existing geographic / hardcoded layout
 
-### 4.2 html2canvas SVG gotchas
+### Constraints
 
-If your graph is pure SVG, html2canvas can render it directly. If there are foreignObject elements or complex CSS-only animations, they may not render. Test by exporting after generating a scenario and confirm the PNG in the PDF shows the subgraph with labels.
+- The force-directed layout MUST stay inside the visible panel (use `forceCenter` + viewport bounds clamping)
+- Labels MUST be offset and not overlap nodes (either above or below based on available space)
+- Arcs MUST NOT cross labels where avoidable (a higher charge strength helps)
+- Labels in the force-directed view should use the entity short name if `entity.short_name` exists, else `entity.name`
 
-If html2canvas produces empty output, fall back to serializing the SVG manually:
+### Apply to expanded view too
 
-```javascript
-const svgEl = graphEl.querySelector(“svg”);
-const svgStr = new XMLSerializer().serializeToString(svgEl);
-const svgBlob = new Blob([svgStr], { type: “image/svg+xml;charset=utf-8” });
-const url = URL.createObjectURL(svgBlob);
-const img = new Image();
-img.src = url;
-await new Promise(r => img.onload = r);
-const canvas = document.createElement(“canvas”);
-canvas.width = svgEl.clientWidth * 2;
-canvas.height = svgEl.clientHeight * 2;
-const ctx = canvas.getContext(“2d”);
-ctx.scale(2, 2);
-ctx.drawImage(img, 0, 0);
-const graphPng = canvas.toDataURL(“image/png”);
-URL.revokeObjectURL(url);
-```
-
-Add html2canvas library via CDN script tag if not already present:
-
-```html
-<script src=“https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js”></script>
-```
+When Expand is open AND a scenario is active, the expanded view also uses the force-directed subgraph layout, scaled to the larger viewport.
 
 ——
 
-## Section 5 - Non-regression checks
+## Section 6 - Non-regression checks
 
 Before declaring done:
 
-1. Welcome message appears at page load.
-1. “New chat” clears scenario history, Report, graph highlight.
-1. First scenario generation: Report renders with headline block (Likelihood + Evidence strength visible at top). Subgraph hides non-relevant nodes. A scenario card appears in chat.
-1. Generate a second scenario (different question): second card appears in chat. Graph now shows the second subgraph. First scenario is still recallable.
-1. Click the first scenario card: Report and graph switch back to first scenario. Card becomes active (visually distinct).
-1. Click the second scenario card: Report and graph switch forward.
-1. PDF export on the currently rendered scenario produces a 2-page PDF: Report + Subgraph snapshot.
-1. brief_text still never appears in the DOM.
-1. No JS errors in the console.
+1. Welcome message at page load.
+1. New chat clears scenario history, Report, graph highlight, Intel panel.
+1. Generate first scenario:
+- Report renders with question blockquote visible
+- Headline block shows BOTH Likelihood AND Evidence strength
+- Subgraph nodes are positioned by force layout, no overlap
+- Every visible node has a label
+- Intel panel shows “Evidence strength: [same number as Report]”
+1. Tap Expand on graph: expanded view shows ONLY the subgraph (not the full graph), nodes still readable.
+1. Generate a second scenario: new card in chat, graph re-flows with new force layout.
+1. Tap first card: Report and graph switch back, force layout re-applied to first scenario subgraph.
+1. PDF export: 2-page PDF (Report + Subgraph snapshot), snapshot uses the force-directed layout.
+1. brief_text never appears in DOM.
+1. No JS errors in console.
+1. Confidence widget no longer present anywhere.
 
 ——
 
-## Section 6 - Commit message
+## Section 7 - Commit message
 
 ```
-feat: scenario history, subgraph isolation, PDF snapshot
+feat: graph readability + evidence strength unification + question render
 
-- Chat shows clickable cards for each generated scenario
-- Clicking a card recalls that scenario (Report + subgraph) client-side
-- Subgraph now hides non-relevant nodes/relations (display:none)
-- PDF export includes subgraph snapshot on second page
-- New headline block in Report: Likelihood + Evidence strength
-- html2canvas added via CDN for graph-to-PNG capture
+- Force-directed layout for active subgraphs (d3-force)
+- Expand preserves subgraph filter
+- Every node renders with a label
+- Confidence widget replaced with Evidence strength (single source: client-computed)
+- Report renders user_question as inline blockquote
+- New CSS for .scenario-question, force layout viewport bounds
 ```
 
 ——
 
-## Section 7 - If something is ambiguous
+## Section 8 - If something is ambiguous
 
-Match existing patterns. Keep minimal. Do not introduce new libraries besides html2canvas. If html2pdf is already present, reuse it.
+Match existing patterns. If d3 is not yet in the project, add it via CDN. Keep the full-graph (Atlas) layout untouched.
