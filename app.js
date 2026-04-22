@@ -1,6 +1,6 @@
-// GeoIntel Reader · app.js · v2.3.2
+// GeoIntel Reader · app.js · v2.3.3
 
-const APP_VERSION = "2.3.2";
+const APP_VERSION = "2.3.3";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -825,7 +825,6 @@ function handleChatSubmit(text) {
 
   CHAT_IN_FLIGHT = true;
   CHAT_ERROR = null;
-  render();
 
   // v2.2 Section 2.4: `current_scenario` is the REDUCED form of the currently
   // rendered scenario, or null. The LLM uses it for follow-up continuity.
@@ -842,12 +841,19 @@ function handleChatSubmit(text) {
   };
 
   // v2.3.1: payload diagnostics (also mirrored to the on-screen debug log).
+  // These must run BEFORE render() so the on-screen panel shows the entries
+  // for the in-flight request; otherwise a hanging fetch leaves the panel
+  // stale at the previous turn's count.
   debugLog("PAYLOAD SIZE BYTES:", new Blob([JSON.stringify(payload)]).size);
   debugLog("PAYLOAD KEYS:", Object.keys(payload));
   debugLog("KG ENTITIES COUNT:", payload.kg && payload.kg.entities && payload.kg.entities.length);
   debugLog("KG RELATIONS COUNT:", payload.kg && payload.kg.relations && payload.kg.relations.length);
   debugLog("HISTORY LENGTH:", payload.history && payload.history.length);
   debugLog("CURRENT_SCENARIO PRESENT:", !!payload.current_scenario);
+
+  // Render AFTER debugLog so the user sees the pre-fetch diagnostics even
+  // if the server never responds.
+  render();
 
   // Client-side timeout. If the Edge Function hangs (e.g. a slow LLM call
   // that the runtime then EarlyDrops), we want a clear error instead of
