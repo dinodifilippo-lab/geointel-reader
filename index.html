@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- GeoIntel Reader v2.3.0 -->
+<!-- GeoIntel Reader v2.3.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -250,6 +250,21 @@ html, body {
 .chat-error .chat-error-text { flex: 1 1 auto; min-width: 0; }
 .chat-error-dismiss { flex: 0 0 auto; width: 20px; height: 20px; border: none; background: transparent; color: var(--coral); font-size: 16px; line-height: 1; cursor: pointer; border-radius: 4px; display: grid; place-items: center; transition: background 0.15s ease; }
 .chat-error-dismiss:hover { background: rgba(184,32,58,0.15); }
+
+/* v2.3.2: on-screen debug log (needed for iPad where DevTools is off). */
+.debug-panel { margin-bottom: 8px; background: #fbfaf4; border: 1px solid #d9d6ce; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text-2); max-height: 220px; overflow-y: auto; }
+.debug-panel summary { padding: 6px 10px; cursor: pointer; user-select: none; font-weight: 700; color: var(--text-3); display: flex; align-items: center; justify-content: space-between; gap: 8px; letter-spacing: 0.04em; text-transform: uppercase; list-style: none; }
+.debug-panel summary::-webkit-details-marker { display: none; }
+.debug-panel summary::before { content: "▸ "; color: var(--text-4); margin-right: 4px; }
+.debug-panel[open] summary::before { content: "▾ "; }
+.debug-clear { border: 1px solid #d9d6ce; background: #ffffff; color: var(--text-3); font-family: inherit; font-size: 9.5px; padding: 2px 8px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; }
+.debug-clear:hover { background: var(--text-1); color: #ffffff; border-color: var(--text-1); }
+.debug-body { padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid #efece4; }
+.debug-row { display: grid; grid-template-columns: 60px 170px 1fr; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #efece4; word-break: break-all; }
+.debug-row:last-child { border-bottom: none; }
+.debug-ts { color: var(--text-4); }
+.debug-label { color: var(--teal); font-weight: 700; }
+.debug-text { color: var(--text-1); }
 
 /* === v2.0: scenario report, dynamic KG graph, empty state === */
 .msg-type-tag { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-4); }

@@ -1,7 +1,31 @@
-// GeoIntel Reader · app.js · v2.3.1
+// GeoIntel Reader · app.js · v2.3.2
 
-const APP_VERSION = "2.3.1";
+const APP_VERSION = "2.3.2";
 console.log("GeoIntel Reader " + APP_VERSION);
+
+// ============ ON-SCREEN DEBUG LOG ============
+// Needed for diagnostics on iPad where Web Inspector is off. Every
+// diagnostic call below mirrors to this ring buffer; the chat panel
+// renders it inside a <details> that auto-opens when CHAT_ERROR fires.
+const DEBUG_LOG_CAP = 40;
+let DEBUG_LOG = [];
+function debugLog(label, data) {
+  try { console.log(label, data); } catch (e) {}
+  let text;
+  try {
+    if (data === undefined) text = "";
+    else if (typeof data === "string") text = data;
+    else if (typeof data === "number" || typeof data === "boolean") text = String(data);
+    else text = JSON.stringify(data);
+  } catch (e) { text = "[unserialisable: " + (e && e.message) + "]"; }
+  if (text && text.length > 300) text = text.slice(0, 300) + "…";
+  const d = new Date();
+  const ts = String(d.getHours()).padStart(2, "0") + ":" +
+             String(d.getMinutes()).padStart(2, "0") + ":" +
+             String(d.getSeconds()).padStart(2, "0");
+  DEBUG_LOG.push({ ts: ts, label: label, text: text });
+  if (DEBUG_LOG.length > DEBUG_LOG_CAP) DEBUG_LOG.shift();
+}
 
 // ============ LIVE CHAT BACKEND ============
 // Supabase Edge Function: geointel-reader-chat (contract v2.2, typed responses
@@ -241,6 +265,7 @@ function renderChatPanel() {
             '<button type="button" class="chat-error-dismiss" id="chat-error-dismiss" aria-label="Dismiss">×</button>' +
           '</div>'
         : '') +
+      renderDebugPanel() +
       (CHAT_IN_FLIGHT
         ? '<div class="chat-loading" id="chat-loading" aria-live="polite">Analysing<span class="dots"></span></div>'
         : '') +
@@ -252,6 +277,23 @@ function renderChatPanel() {
       '</div>' +
     '</form>' +
   '</aside>';
+}
+
+function renderDebugPanel() {
+  if (!DEBUG_LOG.length) return '';
+  // Auto-open when an error is visible; user can close/reopen with the caret.
+  const openAttr = CHAT_ERROR ? ' open' : '';
+  const rows = DEBUG_LOG.map(function(e) {
+    return '<div class="debug-row">' +
+      '<span class="debug-ts">' + escapeHTML(e.ts) + '</span>' +
+      '<span class="debug-label">' + escapeHTML(e.label) + '</span>' +
+      '<span class="debug-text">' + escapeHTML(e.text) + '</span>' +
+    '</div>';
+  }).join("");
+  return '<details class="debug-panel"' + openAttr + '>' +
+    '<summary>Debug log · ' + DEBUG_LOG.length + ' entries <button type="button" class="debug-clear" id="debug-clear">clear</button></summary>' +
+    '<div class="debug-body">' + rows + '</div>' +
+  '</details>';
 }
 
 function formatToday() {
@@ -523,6 +565,14 @@ function wireCommonChrome() {
     REPORT_LOADING = false;
     render();
   });
+  // Debug-log clear button inside the chat panel.
+  const dbgClear = document.getElementById("debug-clear");
+  if (dbgClear) dbgClear.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    DEBUG_LOG = [];
+    render();
+  });
   // Graph fullscreen expand + close + overlay dismiss.
   const expandBtn = document.getElementById("graph-expand-btn");
   if (expandBtn) expandBtn.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = true; render(); });
@@ -791,13 +841,13 @@ function handleChatSubmit(text) {
     current_scenario: _csReduced
   };
 
-  // v2.3.1: payload diagnostics (keep until the EarlyDrop cause is pinned).
-  console.log("PAYLOAD SIZE BYTES:", new Blob([JSON.stringify(payload)]).size);
-  console.log("PAYLOAD KEYS:", Object.keys(payload));
-  console.log("KG ENTITIES COUNT:", payload.kg && payload.kg.entities && payload.kg.entities.length);
-  console.log("KG RELATIONS COUNT:", payload.kg && payload.kg.relations && payload.kg.relations.length);
-  console.log("HISTORY LENGTH:", payload.history && payload.history.length);
-  console.log("CURRENT_SCENARIO PRESENT:", !!payload.current_scenario);
+  // v2.3.1: payload diagnostics (also mirrored to the on-screen debug log).
+  debugLog("PAYLOAD SIZE BYTES:", new Blob([JSON.stringify(payload)]).size);
+  debugLog("PAYLOAD KEYS:", Object.keys(payload));
+  debugLog("KG ENTITIES COUNT:", payload.kg && payload.kg.entities && payload.kg.entities.length);
+  debugLog("KG RELATIONS COUNT:", payload.kg && payload.kg.relations && payload.kg.relations.length);
+  debugLog("HISTORY LENGTH:", payload.history && payload.history.length);
+  debugLog("CURRENT_SCENARIO PRESENT:", !!payload.current_scenario);
 
   // Client-side timeout. If the Edge Function hangs (e.g. a slow LLM call
   // that the runtime then EarlyDrops), we want a clear error instead of
@@ -816,10 +866,10 @@ function handleChatSubmit(text) {
     body: JSON.stringify(payload),
     signal: controller.signal
   }).then(function(resp) {
-    // v2.3.1: response diagnostics.
-    console.log("RESPONSE STATUS:", resp.status);
-    console.log("RESPONSE OK:", resp.ok);
-    console.log("RESPONSE HEADERS:", [...resp.headers.entries()]);
+    // v2.3.1: response diagnostics (also mirrored on-screen).
+    debugLog("RESPONSE STATUS:", resp.status);
+    debugLog("RESPONSE OK:", resp.ok);
+    debugLog("RESPONSE HEADERS:", [...resp.headers.entries()]);
     if (!resp.ok) {
       return resp.text().then(function(errText) {
         throw new Error("HTTP " + resp.status + ": " + (errText ? errText.slice(0, 300) : resp.statusText || "no body"));
@@ -847,8 +897,10 @@ function handleChatSubmit(text) {
     handleResponse(data || {});
   }).catch(function(err) {
     clearTimeout(timeoutId);
-    // v2.3.1: verbose failure diagnostics.
-    console.error("FETCH FAILED:", err && err.name, err && err.message, err && err.stack);
+    // v2.3.1: verbose failure diagnostics (also mirrored on-screen).
+    debugLog("FETCH FAILED name:", err && err.name);
+    debugLog("FETCH FAILED message:", err && err.message);
+    debugLog("FETCH FAILED stack:", err && err.stack);
     console.error("Chat error:", err);
     CHAT_IN_FLIGHT = false;
     REPORT_LOADING = false;
