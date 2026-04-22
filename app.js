@@ -791,27 +791,64 @@ function handleChatSubmit(text) {
     current_scenario: _csReduced
   };
 
+  // Client-side timeout. If the Edge Function hangs (e.g. a slow LLM call
+  // that the runtime then EarlyDrops), we want a clear error instead of
+  // an infinite loader. Matches the max wall-clock budget we assume on
+  // the function side; bump together if the backend limit is raised.
+  const CHAT_TIMEOUT_MS = 180000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(function() { controller.abort(); }, CHAT_TIMEOUT_MS);
+
   fetch(GEOINTEL_CHAT_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": "Bearer " + SUPABASE_ANON_KEY
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal: controller.signal
   }).then(function(resp) {
     if (!resp.ok) {
       return resp.text().then(function(errText) {
-        throw new Error("HTTP " + resp.status + ": " + errText.slice(0, 200));
+        throw new Error("HTTP " + resp.status + ": " + (errText ? errText.slice(0, 300) : resp.statusText || "no body"));
       });
     }
-    return resp.json();
+    // Read as text first so we can surface non-JSON bodies (EarlyDrop can
+    // truncate the response mid-stream).
+    return resp.text().then(function(txt) {
+      try { return JSON.parse(txt); }
+      catch (e) {
+        throw new Error("Malformed JSON from engine (likely EarlyDrop). First 200 chars: " + (txt || "").slice(0, 200));
+      }
+    });
   }).then(function(data) {
+    clearTimeout(timeoutId);
+    // Defensive logging so an unexpected type is visible in DevTools
+    // instead of silently leaving the UI stuck.
+    if (!data || typeof data !== "object") {
+      console.warn("Engine returned non-object payload:", data);
+    } else if (data.error) {
+      throw new Error("Engine error: " + String(data.error).slice(0, 300));
+    } else if (!data.type) {
+      console.warn("Engine returned no `type`; payload was:", data);
+    }
     handleResponse(data || {});
   }).catch(function(err) {
+    clearTimeout(timeoutId);
     console.error("Chat error:", err);
     CHAT_IN_FLIGHT = false;
     REPORT_LOADING = false;
-    CHAT_ERROR = "Unable to reach the analysis engine. Please try again.";
+    // Make the cause visible in the UI, not only in DevTools. Timeout and
+    // EarlyDrop look different, so the user / operator can triage.
+    const isAbort = err && (err.name === "AbortError" || /abort/i.test(String(err.message || "")));
+    if (isAbort) {
+      CHAT_ERROR = "Request timed out after " + Math.round(CHAT_TIMEOUT_MS / 1000) +
+        "s. The Edge Function likely hit its wall-clock limit (EarlyDrop). " +
+        "Raise `wallClockLimitMs` on the function and retry.";
+    } else {
+      const detail = (err && err.message) ? String(err.message).slice(0, 260) : "unknown error";
+      CHAT_ERROR = "Analysis engine error: " + detail;
+    }
     // Roll back the API history since the turn did not land.
     if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") {
       chatHistory.pop();
