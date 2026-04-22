@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- GeoIntel Reader v2.0.0 -->
+<!-- GeoIntel Reader v2.2.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -275,6 +275,28 @@ html, body {
 .scenario-report .arc-ref { font-family: 'JetBrains Mono', monospace; font-size: 0.88em; background: rgba(13,122,110,0.08); color: var(--teal); padding: 0.05em 0.35em; border-radius: 3px; border: 1px solid rgba(13,122,110,0.18); }
 .scenario-report blockquote { position: relative; margin: 20px 0; padding: 14px 20px; font-style: italic; color: var(--text-2); border-left: 3px solid var(--gold); background: linear-gradient(90deg, var(--gold-bg) 0%, transparent 60%); border-radius: 0 6px 6px 0; font-size: 15.5px; line-height: 1.55; }
 
+/* v2.2 Section 1: headline block (Likelihood + Evidence strength). */
+.scenario-report .scenario-headline { display: flex; gap: 2rem; padding: 0.75rem 0; margin: 0.5rem 0 1.25rem 0; border-top: 1px solid #d9d6ce; border-bottom: 1px solid #d9d6ce; flex-wrap: wrap; }
+.scenario-report .headline-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.scenario-report .headline-label { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 700; }
+.scenario-report .headline-value { font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 600; color: var(--teal); letter-spacing: -0.005em; }
+.scenario-report .headline-range { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 400; color: var(--text-3); margin-left: 0.35rem; }
+
+/* v2.2 Section 2.2: clickable scenario-recall cards in the chat flow. */
+.scenario-card { align-self: flex-start; max-width: 92%; margin: 2px 0; padding: 10px 14px; border: 1px solid var(--teal); border-radius: 10px; background: rgba(13,122,110,0.04); cursor: pointer; transition: background 0.12s ease, transform 0.12s ease; animation: slideIn 0.3s ease; outline: none; }
+.scenario-card:hover { background: rgba(13,122,110,0.09); transform: translateX(1px); }
+.scenario-card:focus-visible { box-shadow: 0 0 0 3px rgba(13,122,110,0.25); }
+.scenario-card.active { background: rgba(13,122,110,0.14); border-width: 2px; padding: 9px 13px; }
+.scenario-card-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--teal); text-transform: uppercase; margin-bottom: 4px; }
+.scenario-card-title { font-family: 'Fraunces', serif; font-size: 14px; font-weight: 500; color: var(--text-1); line-height: 1.3; margin-bottom: 3px; letter-spacing: -0.01em; }
+.scenario-card-hint { font-family: 'Fraunces', serif; font-size: 11.5px; font-style: italic; color: var(--text-3); }
+
+/* v2.2 Section 4: PDF export layout classes. */
+.pdf-page-break { page-break-after: always; break-after: page; height: 0; }
+.pdf-section { page-break-inside: avoid; }
+.pdf-section-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: 20px; margin: 0 0 4px 0; color: var(--text-1); letter-spacing: -0.015em; }
+.pdf-section-sub { font-family: 'Fraunces', serif; font-style: italic; font-size: 12px; color: var(--text-3); margin: 0 0 14px 0; }
+
 /* KG dynamic graph styling (replaces the old per-dossier graph_svg). */
 .kg-graph { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .kg-arc { transition: stroke-opacity 0.2s ease, stroke-width 0.2s ease; }
@@ -282,12 +304,14 @@ html, body {
 .kg-node > circle { transition: r 0.15s ease, stroke-width 0.15s ease; }
 .kg-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; fill: var(--text-2); pointer-events: none; font-weight: 600; letter-spacing: 0.02em; }
 
-/* Active-subgraph dim: non-highlighted nodes/arcs fade to ~25% opacity. */
+/* Active-subgraph isolation (v2.2 Section 3): fully HIDE non-highlighted
+   nodes/arcs instead of dimming. `display:none` on the <g> node group also
+   hides the child label, so orphan labels cannot float. */
 .graph-panel.active-subgraph .kg-node:not(.highlighted),
 .graph-panel.active-subgraph .kg-arc:not(.highlighted),
 .graph-overlay-box.active-subgraph .kg-node:not(.highlighted),
 .graph-overlay-box.active-subgraph .kg-arc:not(.highlighted) {
-  opacity: 0.22;
+  display: none;
 }
 .graph-panel.active-subgraph .kg-node.highlighted > circle { r: 10; stroke-width: 2.5; filter: drop-shadow(0 0 4px rgba(184,32,58,0.45)); }
 .graph-panel.active-subgraph .kg-arc.highlighted { stroke-opacity: 1; filter: drop-shadow(0 0 3px rgba(184,32,58,0.3)); }
@@ -499,6 +523,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
 </header>
 <div id="app-root"></div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>

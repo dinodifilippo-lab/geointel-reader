@@ -1,10 +1,10 @@
-// GeoIntel Reader · app.js · v2.0.0
+// GeoIntel Reader · app.js · v2.2.0
 
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.2.0";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ LIVE CHAT BACKEND ============
-// Supabase Edge Function: geointel-reader-chat (contract v2.0, typed responses).
+// Supabase Edge Function: geointel-reader-chat (contract v2.1, typed responses).
 const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat";
 
 // TODO(user): paste your Supabase anon key here before deploying.
@@ -21,10 +21,18 @@ let CHAT_ERROR = null;
 let REPORT_LOADING = false; // shows a loader inside the Report panel after a confirmation.
 const CHAT_HISTORY_CAP = 20;
 
-// Scenario state (spec Section 5.1).
-let currentScenario = null;    // { question, entity_ids[], relation_keys[] } | null
+// Scenario state (spec v2.2 Section 2.1: multi-scenario history).
+// Each item: { id, title, question, report_html, entity_ids, relation_keys, created_at }.
+let scenarioHistory = [];
+let currentScenarioIndex = -1;
 let chatHistory = [];          // [{role:"user"|"assistant", content:string}]
 let lastAssistantType = null;  // type from last assistant response
+
+function getCurrentScenario() {
+  return currentScenarioIndex >= 0 && currentScenarioIndex < scenarioHistory.length
+    ? scenarioHistory[currentScenarioIndex]
+    : null;
+}
 
 // ============ BASEMAP ASSET (async) ============
 let WORLD_LAND = null;
@@ -59,15 +67,15 @@ const MAP_W = 1200, MAP_H = 600;
 // ============ ROUTING ============
 // v2.0: routes are driven by scenario state, not the URL. The hash only
 // distinguishes the Atlas "home" (default) from the scenario-populated view.
-// The populated view is shown whenever `currentScenario` is non-null OR
+// The populated view is shown whenever `getCurrentScenario()` is non-null OR
 // when a scenario generation is in flight (REPORT_LOADING).
 function getRoute() {
-  if (currentScenario || REPORT_LOADING) return { view: "scenario" };
+  if (getCurrentScenario() || REPORT_LOADING) return { view: "scenario" };
   return { view: "home" };
 }
 
 window.addEventListener("hashchange", function() {
-  if (!currentScenario && !REPORT_LOADING) ATLAS_VIEW = { level: "world", clusterId: null };
+  if (!getCurrentScenario() && !REPORT_LOADING) ATLAS_VIEW = { level: "world", clusterId: null };
   render();
 });
 window.addEventListener("DOMContentLoaded", render);
@@ -108,7 +116,8 @@ let BASEMAP_LOADED = false;
 function newChat() {
   saveChatToArchive();
   GLOBAL_CHAT = [makeGreeting()];
-  currentScenario = null;
+  scenarioHistory = [];
+  currentScenarioIndex = -1;
   chatHistory = [];
   lastAssistantType = null;
   CHAT_IN_FLIGHT = false;
@@ -155,8 +164,8 @@ function renderTopbar(route) {
 
   if (route.view === "scenario") {
     leftEl.innerHTML = '<a class="back-to-atlas" href="#" id="back-to-atlas">← Atlas</a>';
-    const title = currentScenario && currentScenario.title
-      ? currentScenario.title
+    const title = getCurrentScenario() && getCurrentScenario().title
+      ? getCurrentScenario().title
       : (REPORT_LOADING ? "Generating scenario…" : "Scenario");
     centerEl.innerHTML = '<span class="dossier-pill">SCENARIO · ' + escapeHTML(title.toUpperCase()) + '</span>';
   } else {
@@ -179,7 +188,7 @@ function renderWorkingSurfaceHTML() {
 }
 
 function renderGraphOverlay() {
-  const title = currentScenario && currentScenario.title ? currentScenario.title : "Subgraph";
+  const title = getCurrentScenario() && getCurrentScenario().title ? getCurrentScenario().title : "Subgraph";
   return '<div class="graph-overlay" role="dialog" aria-label="Graph fullscreen">' +
     '<div class="graph-overlay-bg" data-overlay-dismiss="1"></div>' +
     '<div class="graph-overlay-box">' +
@@ -335,17 +344,17 @@ function computeAmbientViewBox() {
 
 // ============ POPULATED RIGHT (scenario-driven, v2.0) ============
 function renderPopulatedRight() {
-  const subAttr = currentScenario ? ' data-active-subgraph="1"' : '';
+  const subAttr = getCurrentScenario() ? ' data-active-subgraph="1"' : '';
   const reportBody = REPORT_LOADING
     ? renderReportLoader()
-    : (currentScenario
-        ? renderScenarioReport(currentScenario)
+    : (getCurrentScenario()
+        ? renderScenarioReport(getCurrentScenario())
         : renderReportEmpty());
-  const reportTitle = currentScenario && currentScenario.title
-    ? '<span class="panel-title">Report · <span class="scenario-title-inline">' + escapeHTML(currentScenario.title) + '</span></span>'
+  const reportTitle = getCurrentScenario() && getCurrentScenario().title
+    ? '<span class="panel-title">Report · <span class="scenario-title-inline">' + escapeHTML(getCurrentScenario().title) + '</span></span>'
     : '<span class="panel-title">Report</span>';
   return '<div class="upper-strip">' +
-    '<section class="graph-panel' + (currentScenario ? ' active-subgraph' : '') + '"' + subAttr + '>' +
+    '<section class="graph-panel' + (getCurrentScenario() ? ' active-subgraph' : '') + '"' + subAttr + '>' +
       '<div class="panel-header">' +
         '<span class="panel-title">Subgraph</span>' +
         '<button class="panel-action panel-action-btn" id="graph-expand-btn" type="button" aria-label="Open graph fullscreen">Expand</button>' +
@@ -503,7 +512,8 @@ function wireCommonChrome() {
   const backBtn = document.getElementById("back-to-atlas");
   if (backBtn) backBtn.addEventListener("click", function(e) {
     e.preventDefault();
-    currentScenario = null;
+    // Keep scenarios in history; just detach from the current view.
+    currentScenarioIndex = -1;
     REPORT_LOADING = false;
     render();
   });
@@ -515,9 +525,18 @@ function wireCommonChrome() {
   document.querySelectorAll("[data-overlay-dismiss]").forEach(function(el) {
     el.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = false; render(); });
   });
-  // PDF export: plain window.print() with @media print CSS.
+  // Scenario-card click: recall that scenario (v2.2 Section 2.3).
+  document.querySelectorAll(".scenario-card").forEach(function(card) {
+    const id = card.getAttribute("data-scenario-id");
+    if (!id) return;
+    card.addEventListener("click", function() { recallScenario(id); });
+    card.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); recallScenario(id); }
+    });
+  });
+  // PDF export with graph snapshot (v2.2 Section 4).
   document.querySelectorAll(".download-btn").forEach(function(btn) {
-    btn.addEventListener("click", function() { window.print(); });
+    btn.addEventListener("click", function() { exportScenarioPdf(); });
   });
   // Archive drawer entry wiring.
   wireArchiveDrawer();
@@ -752,12 +771,18 @@ function handleChatSubmit(text) {
   CHAT_ERROR = null;
   render();
 
+  // v2.2 Section 2.4: `current_scenario` is the REDUCED form of the currently
+  // rendered scenario, or null. The LLM uses it for follow-up continuity.
+  const _csFull = getCurrentScenario();
+  const _csReduced = _csFull
+    ? { question: _csFull.question, entity_ids: _csFull.entity_ids, relation_keys: _csFull.relation_keys }
+    : null;
   const payload = {
     question: text,
     history: chatHistory.slice(-CHAT_HISTORY_CAP - 1, -1), // everything before the just-pushed user msg, capped
     kg: (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] },
     dossier_index: buildDossierIndex(),
-    current_scenario: currentScenario
+    current_scenario: _csReduced
   };
 
   fetch(GEOINTEL_CHAT_ENDPOINT, {
@@ -814,16 +839,33 @@ function handleResponse(data) {
   chatHistory.push({ role: "assistant", content: bubbleText || "" });
 
   if (type === "scenario" && data.scenario && typeof data.scenario === "object") {
-    currentScenario = {
-      question: data.scenario.question || (chatHistory.length >= 2 ? chatHistory[chatHistory.length - 2].content : ""),
+    // v2.2 Section 2.1: push into scenarioHistory with a unique id and
+    // set currentScenarioIndex. A scenario card (Section 2.2) will also
+    // appear in the chat flow, appended to GLOBAL_CHAT below.
+    const scenarioId = "sc_" + Date.now() + "_" + Math.floor(Math.random() * 1e6).toString(36);
+    const question = data.scenario.question
+      || (chatHistory.length >= 2 ? chatHistory[chatHistory.length - 2].content : "");
+    const scenarioObj = {
+      id: scenarioId,
       title: data.scenario.title || "Scenario",
+      question: question,
       report_html: data.scenario.report_html || "",
       entity_ids: Array.isArray(data.scenario.entity_ids) ? data.scenario.entity_ids.slice() : [],
-      relation_keys: Array.isArray(data.scenario.relation_keys) ? data.scenario.relation_keys.slice() : []
+      relation_keys: Array.isArray(data.scenario.relation_keys) ? data.scenario.relation_keys.slice() : [],
+      created_at: new Date().toISOString()
     };
+    scenarioHistory.push(scenarioObj);
+    currentScenarioIndex = scenarioHistory.length - 1;
+    // Append a clickable recall card to the chat flow (v2.2 Section 2.2).
+    GLOBAL_CHAT.push({
+      role: "scenario-card",
+      time: now,
+      scenario_id: scenarioId,
+      scenario_title: scenarioObj.title
+    });
     REPORT_LOADING = false;
   } else {
-    // Any non-scenario type: leave currentScenario alone (follow-ups may still
+    // Any non-scenario type: leave getCurrentScenario() alone (follow-ups may still
     // reference it) but clear the loader.
     REPORT_LOADING = false;
   }
@@ -951,10 +993,10 @@ function applyScenarioHighlight() {
     panel.querySelectorAll(".kg-node.highlighted, .kg-arc.highlighted").forEach(function(el) {
       el.classList.remove("highlighted");
     });
-    if (!currentScenario) return;
+    if (!getCurrentScenario()) return;
     panel.classList.add("active-subgraph");
-    const ids = new Set(currentScenario.entity_ids || []);
-    const keys = new Set(currentScenario.relation_keys || []);
+    const ids = new Set(getCurrentScenario().entity_ids || []);
+    const keys = new Set(getCurrentScenario().relation_keys || []);
     panel.querySelectorAll(".kg-node").forEach(function(n) {
       if (ids.has(n.getAttribute("data-node-id"))) n.classList.add("highlighted");
     });
@@ -965,9 +1007,9 @@ function applyScenarioHighlight() {
   // Mirror the highlight in the fullscreen overlay (if open).
   document.querySelectorAll(".graph-overlay .kg-graph").forEach(function(svg) {
     svg.parentElement.classList.add("active-subgraph");
-    if (!currentScenario) return;
-    const ids = new Set(currentScenario.entity_ids || []);
-    const keys = new Set(currentScenario.relation_keys || []);
+    if (!getCurrentScenario()) return;
+    const ids = new Set(getCurrentScenario().entity_ids || []);
+    const keys = new Set(getCurrentScenario().relation_keys || []);
     svg.querySelectorAll(".kg-node").forEach(function(n) {
       n.classList.toggle("highlighted", ids.has(n.getAttribute("data-node-id")));
     });
@@ -979,7 +1021,7 @@ function applyScenarioHighlight() {
 
 // Derive a minimal Intel panel payload from the active scenario.
 function computeScenarioIntel() {
-  if (!currentScenario) {
+  if (!getCurrentScenario()) {
     return {
       confidence: { value: 0.0, label: "No scenario", note: "Ask a question to populate." },
       top_arcs: [],
@@ -989,7 +1031,7 @@ function computeScenarioIntel() {
   const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
   const relByKey = {};
   kg.relations.forEach(function(r) { relByKey[r.from + "|" + r.to + "|" + r.type] = r; });
-  const picked = (currentScenario.relation_keys || [])
+  const picked = (getCurrentScenario().relation_keys || [])
     .map(function(k) { return relByKey[k]; })
     .filter(Boolean);
   const avgConf = picked.length
@@ -1024,15 +1066,126 @@ function computeScenarioIntel() {
   };
 }
 
+// ============ PDF EXPORT (v2.2 Section 4) ============
+// Produces a 2-page PDF: Report body + Subgraph snapshot. Uses html2pdf
+// bundle (which also exposes html2canvas and jsPDF globally). If the
+// libraries are not available (e.g. offline CDN), falls back to
+// window.print() with the existing @media print stylesheet.
+async function exportScenarioPdf() {
+  const scenario = getCurrentScenario();
+  if (!scenario) { window.print(); return; }
+  if (typeof html2pdf !== "function" || typeof html2canvas !== "function") {
+    console.warn("html2pdf / html2canvas not loaded; falling back to window.print()");
+    window.print();
+    return;
+  }
+
+  const reportEl = document.querySelector(".scenario-report")
+    || document.querySelector(".report-scroll");
+  const graphEl = document.querySelector(".graph-panel");
+  if (!reportEl || !graphEl) { window.print(); return; }
+
+  let graphPng = null;
+  try {
+    graphPng = await snapshotGraphAsPng(graphEl);
+  } catch (err) {
+    console.warn("Graph snapshot failed:", err);
+  }
+
+  const reportBody = reportEl.outerHTML;
+  const snapshotBlock = graphPng
+    ? '<div class="pdf-section">' +
+        '<h2 class="pdf-section-title">Subgraph</h2>' +
+        '<p class="pdf-section-sub">Entities and relations highlighted in this scenario.</p>' +
+        '<img src="' + graphPng + '" style="width:100%; height:auto;" />' +
+      '</div>'
+    : '';
+
+  const wrapper = document.createElement("div");
+  wrapper.style.padding = "20px";
+  wrapper.style.fontFamily = "'Fraunces', Georgia, serif";
+  wrapper.innerHTML =
+    '<div class="pdf-section">' + reportBody + '</div>' +
+    (snapshotBlock ? '<div class="pdf-page-break"></div>' + snapshotBlock : '');
+
+  const filename = "geointel-scenario-" + scenario.id + ".pdf";
+  html2pdf().from(wrapper).set({
+    margin: [10, 10, 10, 10],
+    filename: filename,
+    pagebreak: { mode: ["css", "legacy"] },
+    html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+  }).save();
+}
+
+// Try html2canvas first. If the graph is pure SVG and html2canvas returns
+// an empty bitmap (happens on some Safari builds), fall back to serialising
+// the SVG and drawing it via the Image -> canvas pipeline.
+async function snapshotGraphAsPng(graphEl) {
+  // html2canvas route.
+  const canvas = await html2canvas(graphEl, {
+    backgroundColor: "#ffffff",
+    scale: 2,
+    logging: false
+  });
+  if (canvas && canvas.width > 0 && canvas.height > 0) {
+    try { return canvas.toDataURL("image/png"); } catch (e) { /* fall through */ }
+  }
+  // SVG serialisation fallback.
+  const svgEl = graphEl.querySelector("svg");
+  if (!svgEl) throw new Error("No <svg> inside graph panel");
+  const svgStr = new XMLSerializer().serializeToString(svgEl);
+  const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  try {
+    const img = new Image();
+    img.src = url;
+    await new Promise(function(resolve, reject) {
+      img.onload = resolve;
+      img.onerror = function() { reject(new Error("SVG image load failed")); };
+    });
+    const w = (svgEl.clientWidth || 720) * 2;
+    const h = (svgEl.clientHeight || 360) * 2;
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return c.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 // ============ MESSAGE / INTEL ============
 function renderMessage(m) {
   if (m.role === "user") {
     return '<div class="msg user"><div class="msg-bubble">' + m.text + '</div><div class="msg-time">' + m.time + '</div></div>';
   }
+  if (m.role === "scenario-card") {
+    // v2.2 Section 2.2: clickable recall card for a generated scenario.
+    const active = getCurrentScenario() && getCurrentScenario().id === m.scenario_id ? " active" : "";
+    return '<div class="scenario-card' + active + '" data-scenario-id="' + escapeHTML(m.scenario_id) + '" role="button" tabindex="0">' +
+      '<div class="scenario-card-label">Scenario generated</div>' +
+      '<div class="scenario-card-title">' + escapeHTML(m.scenario_title || "Scenario") + '</div>' +
+      '<div class="scenario-card-hint">Tap to recall this scenario</div>' +
+    '</div>';
+  }
   const typeTag = m.type && m.type !== "welcome"
     ? '<div class="msg-type-tag">' + m.type.replace(/_/g, " ") + '</div>'
     : '';
   return '<div class="msg ai"><div class="msg-bubble">' + m.text + '</div>' + typeTag + '<div class="msg-time">' + m.time + '</div></div>';
+}
+
+// Recall a previously-generated scenario by id (Section 2.3: purely client-side).
+function recallScenario(id) {
+  const idx = scenarioHistory.findIndex(function(s) { return s.id === id; });
+  if (idx < 0) return;
+  if (idx === currentScenarioIndex) return; // already active, no-op
+  currentScenarioIndex = idx;
+  REPORT_LOADING = false;
+  render();
 }
 
 function renderIntel(intel) {
