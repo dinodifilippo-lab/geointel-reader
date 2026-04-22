@@ -1,10 +1,12 @@
-// GeoIntel Reader · app.js · v2.2.0
+// GeoIntel Reader · app.js · v2.3.0
 
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ LIVE CHAT BACKEND ============
-// Supabase Edge Function: geointel-reader-chat (contract v2.1, typed responses).
+// Supabase Edge Function: geointel-reader-chat (contract v2.2, typed responses
+// with scenario.user_question and a pre-rendered question blockquote inside
+// scenario.report_html; evidence_strength is computed client-side).
 const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat";
 
 // TODO(user): paste your Supabase anon key here before deploying.
@@ -152,8 +154,12 @@ function render() {
   renderTopbar(route);
   root.innerHTML = renderWorkingSurfaceHTML();
   wireWorkingSurface(route.view === "scenario");
-  // After the graph SVG is in the DOM, apply the subgraph dim/highlight.
-  if (route.view === "scenario") applyScenarioHighlight();
+  // After the graph SVG is in the DOM, apply the subgraph filter and inject
+  // the client-computed Evidence strength into the Report headline.
+  if (route.view === "scenario") {
+    applyScenarioHighlight();
+    injectEvidenceStrength();
+  }
 }
 
 // ============ TOPBAR ============
@@ -934,15 +940,63 @@ function computeKgLayout() {
   return positions;
 }
 
+// v2.3 Section 5: force-directed layout for the active subgraph. Falls back
+// to cluster layout if d3-force is not available (e.g. CDN blocked).
+function computeForceLayout(entities, relations, width, height) {
+  if (typeof d3 === "undefined" || typeof d3.forceSimulation !== "function") return null;
+  // d3-force mutates node/link objects in place.
+  const nodes = entities.map(function(e) { return { id: e.id, entity: e }; });
+  const nodeById = {};
+  nodes.forEach(function(n) { nodeById[n.id] = n; });
+  const links = relations
+    .filter(function(r) { return nodeById[r.from] && nodeById[r.to]; })
+    .map(function(r) { return { source: r.from, target: r.to, rel: r }; });
+  const sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(function(d) { return d.id; }).distance(110).strength(0.6))
+    .force("charge", d3.forceManyBody().strength(-380))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collision", d3.forceCollide().radius(34))
+    .stop();
+  for (let i = 0; i < 300; i++) sim.tick();
+  // Clamp to viewport with a margin so labels don't clip.
+  const margin = 32;
+  const positions = {};
+  nodes.forEach(function(n) {
+    positions[n.id] = {
+      cx: +Math.max(margin, Math.min(width - margin, n.x)).toFixed(1),
+      cy: +Math.max(margin, Math.min(height - margin, n.y)).toFixed(1),
+      entity: n.entity
+    };
+  });
+  return positions;
+}
+
 function renderKgGraphSVG(fullscreen) {
   const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
-  const pos = computeKgLayout();
+  const vbW = fullscreen ? 960 : KG_VIEWBOX_W;
+  const vbH = fullscreen ? 540 : KG_VIEWBOX_H;
+  const clusterPos = computeKgLayout();
+  // When a scenario is active, compute a fresh force-directed layout over
+  // just the highlighted subset; non-highlighted nodes stay at their cluster
+  // coords but are hidden via CSS (display:none).
+  const cs = getCurrentScenario();
+  let subgraphPos = null;
+  if (cs && cs.entity_ids && cs.entity_ids.length) {
+    const idSet = new Set(cs.entity_ids);
+    const keySet = new Set(cs.relation_keys || []);
+    const subEntities = kg.entities.filter(function(e) { return idSet.has(e.id); });
+    const subRelations = kg.relations.filter(function(r) { return keySet.has(r.from + "|" + r.to + "|" + r.type); });
+    subgraphPos = computeForceLayout(subEntities, subRelations, vbW, vbH);
+  }
+  function posFor(id) {
+    if (subgraphPos && subgraphPos[id]) return subgraphPos[id];
+    return clusterPos[id];
+  }
   const arcs = kg.relations.map(function(r) {
-    const a = pos[r.from], b = pos[r.to];
+    const a = posFor(r.from), b = posFor(r.to);
     if (!a || !b) return "";
     const key = r.from + "|" + r.to + "|" + r.type;
     const stroke = arcStroke(r.polarity);
-    // Curve slightly so parallel arcs don't overlap.
     const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2;
     const dx = b.cx - a.cx, dy = b.cy - a.cy;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -957,22 +1011,22 @@ function renderKgGraphSVG(fullscreen) {
       ' d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"' +
       ' stroke-opacity="0.85" stroke-linecap="round"/>';
   }).join("");
-  const nodes = Object.keys(pos).map(function(id) {
-    const p = pos[id];
+  // v2.3 Section 3: EVERY node gets a label. Labels are children of the <g>
+  // so display:none on the group hides them too (no orphan labels).
+  const nodes = Object.keys(clusterPos).map(function(id) {
+    const p = posFor(id);
+    if (!p) return "";
     const e = p.entity;
     const fill = e.type === "asset" ? "#a8570f" : "#0d7a6e";
     const r = e.type === "asset" ? 7 : 8;
-    const showLabel = fullscreen || (e.type === "actor");
+    const labelText = e.short_name || e.label || e.id;
     const labelY = (p.cy + r + 10).toFixed(1);
-    const label = showLabel
-      ? '<text class="kg-label" x="' + p.cx.toFixed(1) + '" y="' + labelY + '" text-anchor="middle">' + escapeHTML(e.label) + '</text>'
-      : "";
     return '<g class="kg-node" data-node-id="' + escapeHTML(id) + '" data-type="' + e.type + '">' +
       '<circle cx="' + p.cx.toFixed(1) + '" cy="' + p.cy.toFixed(1) + '" r="' + r + '" fill="' + fill + '" stroke="#ffffff" stroke-width="1.5"/>' +
-      label +
+      '<text class="kg-label" x="' + p.cx.toFixed(1) + '" y="' + labelY + '" text-anchor="middle">' + escapeHTML(labelText) + '</text>' +
     '</g>';
   }).join("");
-  return '<svg class="graph-svg kg-graph" viewBox="0 0 ' + KG_VIEWBOX_W + ' ' + KG_VIEWBOX_H + '" preserveAspectRatio="xMidYMid meet">' +
+  return '<svg class="graph-svg kg-graph" viewBox="0 0 ' + vbW + ' ' + vbH + '" preserveAspectRatio="xMidYMid meet">' +
     '<g class="kg-arcs">' + arcs + '</g>' +
     '<g class="kg-nodes">' + nodes + '</g>' +
   '</svg>';
@@ -988,15 +1042,17 @@ function arcStroke(polarity) {
 }
 
 function applyScenarioHighlight() {
+  const cs = getCurrentScenario();
+  const ids = cs ? new Set(cs.entity_ids || []) : null;
+  const keys = cs ? new Set(cs.relation_keys || []) : null;
+  // In-page graph panel(s).
   document.querySelectorAll(".graph-panel").forEach(function(panel) {
     panel.classList.remove("active-subgraph");
     panel.querySelectorAll(".kg-node.highlighted, .kg-arc.highlighted").forEach(function(el) {
       el.classList.remove("highlighted");
     });
-    if (!getCurrentScenario()) return;
+    if (!cs) return;
     panel.classList.add("active-subgraph");
-    const ids = new Set(getCurrentScenario().entity_ids || []);
-    const keys = new Set(getCurrentScenario().relation_keys || []);
     panel.querySelectorAll(".kg-node").forEach(function(n) {
       if (ids.has(n.getAttribute("data-node-id"))) n.classList.add("highlighted");
     });
@@ -1004,28 +1060,86 @@ function applyScenarioHighlight() {
       if (keys.has(a.getAttribute("data-relation-key"))) a.classList.add("highlighted");
     });
   });
-  // Mirror the highlight in the fullscreen overlay (if open).
-  document.querySelectorAll(".graph-overlay .kg-graph").forEach(function(svg) {
-    svg.parentElement.classList.add("active-subgraph");
-    if (!getCurrentScenario()) return;
-    const ids = new Set(getCurrentScenario().entity_ids || []);
-    const keys = new Set(getCurrentScenario().relation_keys || []);
-    svg.querySelectorAll(".kg-node").forEach(function(n) {
+  // Mirror the highlight in the fullscreen overlay (if open). The CSS rule
+  // uses `.graph-overlay-canvas.active-subgraph` so we flag the canvas.
+  document.querySelectorAll(".graph-overlay-canvas").forEach(function(canvas) {
+    canvas.classList.remove("active-subgraph");
+    if (!cs) return;
+    canvas.classList.add("active-subgraph");
+    canvas.querySelectorAll(".kg-node").forEach(function(n) {
       n.classList.toggle("highlighted", ids.has(n.getAttribute("data-node-id")));
     });
-    svg.querySelectorAll(".kg-arc").forEach(function(a) {
+    canvas.querySelectorAll(".kg-arc").forEach(function(a) {
       a.classList.toggle("highlighted", keys.has(a.getAttribute("data-relation-key")));
     });
   });
 }
 
-// Derive a minimal Intel panel payload from the active scenario.
+// v2.3 Section 1: evidence strength = mean(confidence) of the relations in
+// the scenario's relation_keys, rounded to 2 decimals. null if empty.
+function computeEvidenceStrength() {
+  const cs = getCurrentScenario();
+  if (!cs || !cs.relation_keys || cs.relation_keys.length === 0) return null;
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { relations: [] };
+  const relByKey = {};
+  kg.relations.forEach(function(r) { relByKey[r.from + "|" + r.to + "|" + r.type] = r; });
+  const confs = cs.relation_keys
+    .map(function(k) { return relByKey[k]; })
+    .filter(function(r) { return r && typeof r.confidence === "number"; })
+    .map(function(r) { return r.confidence; });
+  if (!confs.length) return null;
+  const mean = confs.reduce(function(a, b) { return a + b; }, 0) / confs.length;
+  return Math.round(mean * 100) / 100;
+}
+
+function evidenceStrengthLabel(value) {
+  if (value == null) return "—";
+  if (value < 0.55) return "weak";
+  if (value < 0.70) return "moderate";
+  if (value < 0.80) return "moderate-high";
+  return "high";
+}
+
+// Count of scenario arcs that actually matched a KG relation with confidence.
+function evidenceStrengthCount() {
+  const cs = getCurrentScenario();
+  if (!cs || !cs.relation_keys) return 0;
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { relations: [] };
+  const relByKey = {};
+  kg.relations.forEach(function(r) { relByKey[r.from + "|" + r.to + "|" + r.type] = r; });
+  return cs.relation_keys.filter(function(k) {
+    const r = relByKey[k];
+    return r && typeof r.confidence === "number";
+  }).length;
+}
+
+// v2.3 Section 1: after the report_html lands in the DOM, append an
+// Evidence-strength .headline-item to the .scenario-headline emitted by
+// the backend. Idempotent: marked with .evidence-strength to dedupe.
+function injectEvidenceStrength() {
+  const panel = document.querySelector(".scenario-report .scenario-headline");
+  if (!panel) return;
+  if (panel.querySelector(".headline-item.evidence-strength")) return;
+  const value = computeEvidenceStrength();
+  if (value == null) return;
+  const label = evidenceStrengthLabel(value);
+  const item = document.createElement("div");
+  item.className = "headline-item evidence-strength";
+  item.innerHTML =
+    '<span class="headline-label">Evidence strength</span>' +
+    '<span class="headline-value">' + value.toFixed(2) +
+      ' <span class="headline-range">' + escapeHTML(label) + '</span>' +
+    '</span>';
+  panel.appendChild(item);
+}
+
+// Derive the Intel panel payload from the active scenario (v2.3 Section 2:
+// Evidence strength replaces Confidence; same number as the Report).
 function computeScenarioIntel() {
   if (!getCurrentScenario()) {
     return {
-      confidence: { value: 0.0, label: "No scenario", note: "Ask a question to populate." },
-      top_arcs: [],
-      events: []
+      evidence: { value: null, label: "—", note: "Generate a scenario to see evidence strength." },
+      top_arcs: []
     };
   }
   const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
@@ -1034,14 +1148,11 @@ function computeScenarioIntel() {
   const picked = (getCurrentScenario().relation_keys || [])
     .map(function(k) { return relByKey[k]; })
     .filter(Boolean);
-  const avgConf = picked.length
-    ? picked.reduce(function(s, r) { return s + (r.confidence || 0); }, 0) / picked.length
-    : 0;
-  const label = avgConf >= 0.8 ? "High confidence"
-    : avgConf >= 0.65 ? "Moderate-high confidence"
-    : avgConf > 0 ? "Moderate confidence" : "—";
-  const note = picked.length
-    ? "Averaged over " + picked.length + " arc(s) in the highlighted subgraph."
+  const value = computeEvidenceStrength();
+  const label = evidenceStrengthLabel(value);
+  const note = value != null
+    ? label.charAt(0).toUpperCase() + label.slice(1) + " — mean confidence across " +
+      evidenceStrengthCount() + " arc" + (evidenceStrengthCount() === 1 ? "" : "s") + " in this scenario."
     : "No arcs matched in the current scenario.";
   const idLabel = {};
   kg.entities.forEach(function(e) { idLabel[e.id] = e.label; });
@@ -1060,9 +1171,8 @@ function computeScenarioIntel() {
       };
     });
   return {
-    confidence: { value: avgConf, label: label, note: note },
-    top_arcs: topArcs,
-    events: []
+    evidence: { value: value, label: label, note: note },
+    top_arcs: topArcs
   };
 }
 
@@ -1189,9 +1299,16 @@ function recallScenario(id) {
 }
 
 function renderIntel(intel) {
-  const C = intel.confidence;
+  // v2.3 Section 2: Evidence strength replaces Confidence. Same number as
+  // the Report headline (both use computeEvidenceStrength()).
+  const E = intel.evidence;
+  const hasValue = typeof E.value === "number";
   const circumference = 2 * Math.PI * 23;
-  const offset = circumference * (1 - C.value);
+  const offset = hasValue ? circumference * (1 - E.value) : circumference;
+  const bigLabel = hasValue ? "Evidence strength" : "Evidence strength";
+  const smallLabel = hasValue
+    ? E.label.charAt(0).toUpperCase() + E.label.slice(1)
+    : "";
 
   const arcsHTML = intel.top_arcs.map(function(a) {
     const polaritySign = a.polarity === "neg" ? "−" : "+";
@@ -1206,16 +1323,18 @@ function renderIntel(intel) {
   }).join("");
 
   return '<div class="intel-section">' +
-    '<div class="intel-header"><span class="intel-sec-title">Confidence</span></div>' +
+    '<div class="intel-header"><span class="intel-sec-title">Evidence strength</span></div>' +
     '<div class="confidence-block">' +
       '<div class="gauge">' +
         '<svg width="58" height="58" viewBox="0 0 58 58">' +
           '<circle cx="29" cy="29" r="23" fill="none" stroke="#ebe8df" stroke-width="5"/>' +
-          '<circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>' +
+          (hasValue
+            ? '<circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>'
+            : '') +
         '</svg>' +
-        '<div class="gauge-text">' + C.value.toFixed(2) + '</div>' +
+        '<div class="gauge-text">' + (hasValue ? E.value.toFixed(2) : "—") + '</div>' +
       '</div>' +
-      '<div class="confidence-meta"><div class="big">' + C.label + '</div><div class="small">' + C.note + '</div></div>' +
+      '<div class="confidence-meta"><div class="big">' + (hasValue ? smallLabel : bigLabel) + '</div><div class="small">' + escapeHTML(E.note || "") + '</div></div>' +
     '</div>' +
   '</div>' +
   (arcsHTML

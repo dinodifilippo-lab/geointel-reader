@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- GeoIntel Reader v2.2.0 -->
+<!-- GeoIntel Reader v2.3.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -282,6 +282,10 @@ html, body {
 .scenario-report .headline-value { font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 600; color: var(--teal); letter-spacing: -0.005em; }
 .scenario-report .headline-range { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 400; color: var(--text-3); margin-left: 0.35rem; }
 
+/* v2.3 Section 1: user question blockquote inside the Report. */
+.scenario-report .scenario-question { margin: 1rem 0 1.25rem 0; padding: 10px 16px; border-left: 3px solid var(--teal); background: rgba(13,122,110,0.04); font-family: 'Fraunces', serif; font-style: italic; color: var(--text-1); font-size: 15px; line-height: 1.55; border-radius: 0 6px 6px 0; }
+.scenario-report .scenario-question .question-label { display: block; font-family: 'JetBrains Mono', monospace; font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--teal); margin-bottom: 6px; }
+
 /* v2.2 Section 2.2: clickable scenario-recall cards in the chat flow. */
 .scenario-card { align-self: flex-start; max-width: 92%; margin: 2px 0; padding: 10px 14px; border: 1px solid var(--teal); border-radius: 10px; background: rgba(13,122,110,0.04); cursor: pointer; transition: background 0.12s ease, transform 0.12s ease; animation: slideIn 0.3s ease; outline: none; }
 .scenario-card:hover { background: rgba(13,122,110,0.09); transform: translateX(1px); }
@@ -310,7 +314,9 @@ html, body {
 .graph-panel.active-subgraph .kg-node:not(.highlighted),
 .graph-panel.active-subgraph .kg-arc:not(.highlighted),
 .graph-overlay-box.active-subgraph .kg-node:not(.highlighted),
-.graph-overlay-box.active-subgraph .kg-arc:not(.highlighted) {
+.graph-overlay-box.active-subgraph .kg-arc:not(.highlighted),
+.graph-overlay-canvas.active-subgraph .kg-node:not(.highlighted),
+.graph-overlay-canvas.active-subgraph .kg-arc:not(.highlighted) {
   display: none;
 }
 .graph-panel.active-subgraph .kg-node.highlighted > circle { r: 10; stroke-width: 2.5; filter: drop-shadow(0 0 4px rgba(184,32,58,0.45)); }
@@ -524,6 +530,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
 <div id="app-root"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-force@3/dist/d3-force.min.js" defer></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>
