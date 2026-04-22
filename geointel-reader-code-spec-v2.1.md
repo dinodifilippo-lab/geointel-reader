@@ -1,275 +1,317 @@
 # GeoIntel Reader - Frontend Update Spec
 
-## For Claude Code - v3.0 (scenario projection)
+## For Claude Code - v2.2 (scenario history, cleaner subgraph, richer PDF)
 
 ——
 
 ## TL;DR
 
-Upgrade the Reader from “per-dossier browser with mock chat” to a scenario-projection tool. The chat drives generation of a dynamic Report and a subgraph highlight on demand. Atlas and UI stay the same.
+Iteration on v2.0 (scenario projection). Four targeted changes:
 
-Two changes on the backend side (already done by the user, you do not need to redo them):
+1. Multi-scenario history in chat: after each generation, append a clickable card in the chat. Clicking re-renders that scenario (Report + subgraph) without calling the backend again.
+1. Subgraph isolation: entities and relations not in the current scenario are HIDDEN (display:none), not just dimmed.
+1. PDF export includes a snapshot of the currently highlighted subgraph, placed after the Report body.
+1. The backend now returns likelihood_label, likelihood_range, evidence_strength. Render these in the top of the report (the generator already produces the HTML with the new headline block).
 
-- data.js now contains a `window.CHESS_DATA.kg` block with entities and relations
-- Edge Function `geointel-reader-chat` now has a new request/response contract (v2.0)
-
-Your job: rewire the frontend to call the new contract and render the scenario output dynamically.
-
-——
-
-## What to preserve
-
-- Atlas view on page load (no changes)
-- Chat panel on the right (same position, same styling)
-- Report panel center (same container, different content source)
-- Graph panel (same container, existing click/scroll/expand behaviour)
-- Intel panel (can stay with static dossier-level confidence/arcs for now, or become dynamic - see Section 7)
-- “New chat” button (preserved, now resets scenario state too)
-- All existing CSS and layout
+No changes to Atlas, no changes to the welcome message, no changes to data.js, no changes to the cluster map.
 
 ——
 
-## What changes
+## Section 1 - New Edge Function response fields (v2.1)
 
-1. No dossier-brief-based chat. The chat now calls a two-phase backend that returns typed responses.
-1. Welcome message rendered in the chat at session start.
-1. The Report panel is EMPTY on first load. Content is generated only when the backend returns a `scenario` response.
-1. The Graph panel highlights a subset (entities + arcs) after a scenario is generated. Non-highlighted nodes/arcs are dimmed.
-1. Follow-up questions extend the current scenario state and may re-generate.
+The response shape is unchanged at the top level. New fields live INSIDE scenario.report_html as a headline block rendered by the generator. You do not need to touch them; the HTML arrives ready.
 
-——
-
-## Section 1 - New Edge Function contract
-
-### 1.1 Request (POST)
-
-```
-POST https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat
-Headers:
-  Content-Type: application/json
-  Authorization: Bearer <SUPABASE_ANON_KEY>   (already in the code)
-
-Body JSON:
-{
-  “question”: “user’s new message as string”,
-  “history”: [ { “role”: “user”|”assistant”, “content”: “...” }, ... ],
-  “kg”: window.CHESS_DATA.kg,
-  “dossier_index”: [ { “id”: “...”, “title”: “...”, “description”: “...” } ],
-  “current_scenario”: null or {
-    “question”: “the question that generated current report”,
-    “entity_ids”: [...],
-    “relation_keys”: [...]
-  }
-}
-```
-
-**`dossier_index`** is built by the frontend from `window.CHESS_DATA.dossiers`: for each dossier extract `id`, `title`, `description` (NOT brief_text).
-
-**`current_scenario`** is the client-side state tracking what is currently rendered in the Report + subgraph. Initialize null. When a scenario response arrives, store { question, entity_ids, relation_keys } and pass it in subsequent calls.
-
-### 1.2 Response (200)
-
-```
-{
-  “type”: “welcome” | “clarification” | “ready_to_generate” | “scenario” | “out_of_scope” | “acknowledge” | “scenario_followup”,
-  “message”: “text to append to the chat (in Italian)”,
-  “scenario”: {           // only when type === “scenario”
-    “title”: “...”,
-    “report_html”: “<div class=‘scenario-report’>...</div>”,
-    “entity_ids”: [“iran”, “israel”, ...],
-    “relation_keys”: [“israel|iran|coercive-preventive”, ...]
-  },
-  “debug”: {...}
-}
-```
-
-Error responses (non-2xx): `{ “error”: “...”, “detail”: “...” }`
-
-### 1.3 Behaviour by type
-
-|type               |What the frontend does                                                                                                                                                                                                                          |
-|-——————|————————————————————————————————————————————————————————————————————————————————|
-|`welcome`          |Append `message` as assistant bubble in chat. Report stays empty. Graph stays global.                                                                                                                                                           |
-|`clarification`    |Append `message` as assistant bubble. No Report update. No graph update.                                                                                                                                                                        |
-|`ready_to_generate`|Append `message` as assistant bubble. No Report update yet. No graph update yet. Waits for user confirmation (“si”, “ok”, “procedi” etc.)                                                                                                       |
-|`scenario_followup`|Same as ready_to_generate (also awaits confirmation)                                                                                                                                                                                            |
-|`acknowledge`      |(this type is not typically returned alone - see below)                                                                                                                                                                                         |
-|`scenario`         |Append `message` as assistant bubble (“Procedo con la generazione” or similar). Render `scenario.report_html` in the Report panel. Highlight `scenario.entity_ids` and `scenario.relation_keys` in the graph. Store as `current_scenario` state.|
-|`out_of_scope`     |Append `message` as assistant bubble. No Report update. No graph update.                                                                                                                                                                        |
-
-The backend merges `acknowledge` and generation internally. A single POST returns `type: “scenario”` when the user has confirmed after a `ready_to_generate` turn. You do not need to split the call client-side - just send the user’s confirmation as a normal question, the backend will recognize it from history and return `scenario` directly.
-
-——
-
-## Section 2 - Welcome message on page load
-
-On page load (and on “New chat” click), trigger a request with `question: “”` (empty string). The backend will return `type: “welcome”` with a message. Append it to the chat as the first assistant message.
-
-Alternative simpler implementation: hardcode the welcome message in the frontend. If you prefer this, use:
-
-```
-Ciao. Questa e una demo di GeoIntel Reader. Posso costruire proiezioni di scenario su 6 aree: Russia-Ucraina, Iran (Hormuz e rivalita con USA), Taiwan, AI US-Cina, Mar Rosso-Houthi.
-
-Fai una domanda di scenario. Se mancano elementi per rispondere bene, te li chiedo. Quando lo scenario e chiaro, genero report e sotto-grafo.
-```
-
-Either approach is fine. Hardcoding saves one API call per session.
-
-——
-
-## Section 3 - Report panel rendering
-
-The Report panel currently renders `dossier.reports[current_report_id]`. Replace this with:
-
-- On load / new chat / out_of_scope / clarification / welcome: **empty state** with a subtle placeholder (“Chiedi qualcosa nella chat a destra per generare uno scenario.”)
-- On `type: “scenario”` response: render `scenario.report_html` directly inside the Report panel container. The HTML is pre-structured with the classes expected by the CSS.
-
-Add minimal CSS for the scenario report classes (add to existing stylesheet, keep the visual language):
+What you need is to ADD CSS for the new headline block:
 
 ```css
-.scenario-report {
-  /* reuse existing report container spacing */
-}
-.scenario-report .scenario-meta {
+.scenario-report .scenario-headline {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
+  gap: 2rem;
+  padding: 0.75rem 0;
+  margin: 0.5rem 0 1.25rem 0;
+  border-top: 1px solid var(—border, #e0ddd3);
+  border-bottom: 1px solid var(—border, #e0ddd3);
+}
+.scenario-report .headline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.scenario-report .headline-label {
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(—muted, #888);
-  margin-bottom: 0.75rem;
-}
-.scenario-report .scenario-label {
   font-weight: 600;
 }
-.scenario-report .scenario-subtitle {
-  font-style: italic;
-  color: var(—muted, #666);
+.scenario-report .headline-value {
   font-size: 1.05rem;
-  margin-bottom: 1.5rem;
-}
-.scenario-report h3 {
-  font-size: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
   color: var(—accent, #0d7a6e);
 }
-.scenario-report .arc-ref {
-  font-family: var(—font-mono, monospace);
-  font-size: 0.9em;
-  background: rgba(13, 122, 110, 0.08);
-  padding: 0.05em 0.3em;
-  border-radius: 3px;
+.scenario-report .headline-range {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(—muted, #888);
+  margin-left: 0.35rem;
 }
 ```
 
-PDF export: if there’s already a PDF button in the Reader, make it export the Report panel’s current content. Use html2pdf.js or browser print-to-PDF. Low priority - skip if not trivial.
+Add this block alongside the existing scenario-report CSS you already have.
 
 ——
 
-## Section 4 - Graph subgraph highlighting
+## Section 2 - Scenario history in chat
 
-The graph currently renders the full KG (or per-dossier subsets via the Atlas). After a `type: “scenario”` response, the graph should:
+### 2.1 State change
 
-1. Dim all nodes and arcs to ~30% opacity.
-1. Restore full opacity for nodes whose id is in `scenario.entity_ids`.
-1. Restore full opacity for arcs whose key matches an entry in `scenario.relation_keys`.
+Replace the current single-state `currentScenario` with an array:
 
-Arc key format: `from|to|type` (exactly three pipe-separated fields, matching exactly the relation’s from, to, type in `window.CHESS_DATA.kg.relations`).
+```javascript
+let scenarioHistory = [];  // array of { id, title, question, report_html, entity_ids, relation_keys, created_at }
+let currentScenarioIndex = -1;  // index of the scenario currently rendered, -1 if none
+```
 
-Implementation hint: if the graph rendering uses D3 or similar, filter on data. If it uses static SVG with class names, add an `active-subgraph` CSS class to the panel, and give each node/arc a `data-id` / `data-key` attribute, then CSS does the dimming:
+When a `type: “scenario”` response arrives:
+
+1. Create a new scenario object with a unique id (timestamp is fine), the title, the question that generated it, the report HTML, the entity_ids, the relation_keys, and created_at.
+1. Push to `scenarioHistory`.
+1. Set `currentScenarioIndex = scenarioHistory.length - 1`.
+1. Render it (Report panel + subgraph, as before).
+
+On “New chat”: clear `scenarioHistory = []`, reset `currentScenarioIndex = -1`, empty Report panel, restore full graph.
+
+### 2.2 Chat card for each scenario
+
+When a scenario is generated, after the short confirmation assistant bubble (“Procedo con la generazione.”), append a SECOND element to the chat: a clickable “scenario card”.
+
+HTML shape (add to chat message flow):
+
+```html
+<div class=“scenario-card” data-scenario-id=“[id]”>
+  <div class=“scenario-card-label”>SCENARIO GENERATED</div>
+  <div class=“scenario-card-title”>[title from response]</div>
+  <div class=“scenario-card-hint”>Tap to recall this scenario</div>
+</div>
+```
+
+CSS:
 
 ```css
+.scenario-card {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(—accent, #0d7a6e);
+  border-radius: 6px;
+  background: rgba(13, 122, 110, 0.04);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.scenario-card:hover {
+  background: rgba(13, 122, 110, 0.08);
+}
+.scenario-card-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(—accent, #0d7a6e);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+.scenario-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(—text, #1a1a1a);
+  line-height: 1.3;
+  margin-bottom: 0.2rem;
+}
+.scenario-card-hint {
+  font-size: 0.75rem;
+  color: var(—muted, #888);
+  font-style: italic;
+}
+.scenario-card.active {
+  background: rgba(13, 122, 110, 0.12);
+  border-width: 2px;
+}
+```
+
+### 2.3 Click behaviour on the card
+
+On click:
+
+1. Find the scenario in `scenarioHistory` by its `data-scenario-id`.
+1. Set `currentScenarioIndex` to that scenario’s index.
+1. Re-render Report panel with that scenario’s `report_html`.
+1. Re-highlight graph with that scenario’s `entity_ids` and `relation_keys`.
+1. Remove `.active` class from all scenario cards, add it to the clicked one.
+1. Do NOT call the backend. Purely client-side recall.
+
+When a new scenario is generated, it becomes the active card. Previously active card loses `.active`.
+
+### 2.4 current_scenario in request payload
+
+The Edge Function still expects a `current_scenario` field in the POST payload (for follow-ups). Pass the currently rendered one, i.e., `scenarioHistory[currentScenarioIndex]` reduced to `{ question, entity_ids, relation_keys }`, or `null` if `currentScenarioIndex === -1`.
+
+——
+
+## Section 3 - Subgraph isolation (hide, not dim)
+
+Currently the subgraph highlight dims non-highlighted elements to 25% opacity. Change this to fully hide them.
+
+Update the CSS you already added for `.active-subgraph`:
+
+```css
+/* BEFORE (current) */
 .graph-panel.active-subgraph [data-node-id]:not(.highlighted),
 .graph-panel.active-subgraph [data-relation-key]:not(.highlighted) {
   opacity: 0.25;
 }
+
+/* AFTER (new) */
+.graph-panel.active-subgraph [data-node-id]:not(.highlighted),
+.graph-panel.active-subgraph [data-relation-key]:not(.highlighted) {
+  display: none;
+}
 ```
 
-Then add the `highlighted` class to the matching elements via JS.
+Also hide labels and any decorations tied to hidden nodes (orphan labels would float otherwise). If your graph renders labels as children of node groups, `display: none` on the parent group handles it. If labels are separate elements, give them matching `data-node-id` attributes and include them in the selector.
 
-Click/scroll/expand must continue to work normally on both highlighted and dimmed elements. The highlight is visual only.
-
-On “New chat” or when `current_scenario` becomes null, remove the subgraph highlighting (full opacity everywhere).
+On “New chat” or when `scenarioHistory` becomes empty, the `.active-subgraph` class is removed and everything reappears.
 
 ——
 
-## Section 5 - Chat UI
+## Section 4 - PDF export with graph snapshot
 
-Minimal changes. The chat already handles user input and assistant bubbles. Just:
+Current behaviour: PDF export exports the Report panel content only.
 
-1. Remove any per-dossier context (the chat is global, not tied to a specific dossier).
-1. Ensure each user message triggers one POST to the new endpoint.
-1. Append the assistant `message` from the response as a bubble. If `type === “scenario”`, the chat bubble is short (“Procedo con la generazione.”) - the actual analysis goes into the Report panel, NOT the chat.
-1. Show the loading state: (a) in the chat during all requests, (b) ALSO in the Report panel when you detect `ready_to_generate` followed by confirmation (or simpler: whenever a request is in flight after a ready_to_generate, put a loader in the Report panel too). Easiest implementation: when you send a request and the last assistant bubble was `type: “ready_to_generate”` or `scenario_followup`, show a Report loader.
+New behaviour: PDF export produces a document containing:
 
-### 5.1 State to track in the frontend
+1. The Report panel body (as today)
+1. A page break
+1. A page titled “Subgraph” containing a snapshot of the currently highlighted graph
+
+### 4.1 Implementation approach
+
+Use html2canvas (or equivalent) to capture the graph panel’s SVG as a PNG, then include that image in the html2pdf pipeline.
 
 ```javascript
-let currentScenario = null;  // { question, entity_ids, relation_keys } or null
-let chatHistory = [];         // array of { role, content }
-let lastAssistantType = null; // the `type` field from last assistant response
+async function exportScenarioPdf() {
+  if (currentScenarioIndex < 0) return;
+  const scenario = scenarioHistory[currentScenarioIndex];
+
+  // 1. Snapshot the graph
+  const graphEl = document.querySelector(“.graph-panel”);
+  const graphCanvas = await html2canvas(graphEl, {
+    backgroundColor: “#ffffff”,
+    scale: 2,
+    logging: false,
+  });
+  const graphPng = graphCanvas.toDataURL(“image/png”);
+
+  // 2. Build the composite HTML for the PDF
+  const reportBody = document.querySelector(“.scenario-report”).outerHTML;
+  const composite = `
+    <div class=“pdf-section”>${reportBody}</div>
+    <div class=“pdf-page-break”></div>
+    <div class=“pdf-section”>
+      <h2 class=“pdf-section-title”>Subgraph</h2>
+      <p class=“pdf-section-sub”>Entities and relations highlighted in this scenario.</p>
+      <img src=“${graphPng}” style=“width:100%; height:auto;” />
+    </div>
+  `;
+
+  // 3. Wrap and hand to html2pdf
+  const wrapper = document.createElement(“div”);
+  wrapper.innerHTML = composite;
+  wrapper.style.padding = “20px”;
+  wrapper.style.fontFamily = “’EB Garamond’, Georgia, serif”;
+
+  html2pdf().from(wrapper).set({
+    margin: [10, 10, 10, 10],
+    filename: `geointel-scenario-${scenario.id}.pdf`,
+    pagebreak: { mode: [“css”, “legacy”] },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: “mm”, format: “a4”, orientation: “portrait” },
+  }).save();
+}
 ```
 
-Reset all three on “New chat”.
+CSS for page break:
+
+```css
+.pdf-page-break {
+  page-break-after: always;
+  break-after: page;
+}
+.pdf-section-title {
+  margin-top: 0;
+}
+```
+
+### 4.2 html2canvas SVG gotchas
+
+If your graph is pure SVG, html2canvas can render it directly. If there are foreignObject elements or complex CSS-only animations, they may not render. Test by exporting after generating a scenario and confirm the PNG in the PDF shows the subgraph with labels.
+
+If html2canvas produces empty output, fall back to serializing the SVG manually:
+
+```javascript
+const svgEl = graphEl.querySelector(“svg”);
+const svgStr = new XMLSerializer().serializeToString(svgEl);
+const svgBlob = new Blob([svgStr], { type: “image/svg+xml;charset=utf-8” });
+const url = URL.createObjectURL(svgBlob);
+const img = new Image();
+img.src = url;
+await new Promise(r => img.onload = r);
+const canvas = document.createElement(“canvas”);
+canvas.width = svgEl.clientWidth * 2;
+canvas.height = svgEl.clientHeight * 2;
+const ctx = canvas.getContext(“2d”);
+ctx.scale(2, 2);
+ctx.drawImage(img, 0, 0);
+const graphPng = canvas.toDataURL(“image/png”);
+URL.revokeObjectURL(url);
+```
+
+Add html2canvas library via CDN script tag if not already present:
+
+```html
+<script src=“https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js”></script>
+```
 
 ——
 
-## Section 6 - SUPABASE_ANON_KEY
-
-Already in the code from v1. No change needed.
-
-——
-
-## Section 7 - Intel panel (optional)
-
-The Intel panel currently shows per-dossier confidence / top_arcs / events. Two options:
-
-**Option A (simpler, recommended):** leave it as-is. It shows the dossier that the Atlas is focused on, static.
-
-**Option B:** make it reflect the current scenario. After a `scenario` response, rebuild the panel:
-
-- Confidence: average of the arc confidences in `scenario.relation_keys`
-- Top arcs: the arcs with the highest `weight * confidence` in the subgraph
-- Events: skip (events are not in the KG)
-
-Do Option A unless you have time. The panel is not critical to the scenario story.
-
-——
-
-## Section 8 - Non-regression checks
+## Section 5 - Non-regression checks
 
 Before declaring done:
 
-- Atlas still renders with all 6 dossiers.
-- Cluster map still clickable, Atlas still the default.
-- New chat button resets chat, Report, graph highlight, and currentScenario state.
-- No JS errors in console at load.
-- Welcome message visible at session start.
-- User can ask “che succede a Taiwan” and get a clarification back (not a report).
-- User can ask “quale e la finestra migliore per un’azione cinese su Taiwan” and get a ready_to_generate proposal, then say “si” and see a Report rendered with subgraph highlighted.
-- `brief_text` is still never rendered in the DOM.
-- PDF export (if implemented) exports the Report panel.
+1. Welcome message appears at page load.
+1. “New chat” clears scenario history, Report, graph highlight.
+1. First scenario generation: Report renders with headline block (Likelihood + Evidence strength visible at top). Subgraph hides non-relevant nodes. A scenario card appears in chat.
+1. Generate a second scenario (different question): second card appears in chat. Graph now shows the second subgraph. First scenario is still recallable.
+1. Click the first scenario card: Report and graph switch back to first scenario. Card becomes active (visually distinct).
+1. Click the second scenario card: Report and graph switch forward.
+1. PDF export on the currently rendered scenario produces a 2-page PDF: Report + Subgraph snapshot.
+1. brief_text still never appears in the DOM.
+1. No JS errors in the console.
 
 ——
 
-## Section 9 - Commit message
+## Section 6 - Commit message
 
 ```
-feat: scenario projection mode (chat -> dynamic report + subgraph)
+feat: scenario history, subgraph isolation, PDF snapshot
 
-- Rewire chat to new Edge Function v2.0 contract (two-phase reasoning)
-- Report panel now empty at load, populated on scenario response
-- Graph highlights subgraph after scenario generation, dims the rest
-- Welcome message on session start
-- current_scenario state tracked client-side for follow-ups
-- New chat resets scenario state
+- Chat shows clickable cards for each generated scenario
+- Clicking a card recalls that scenario (Report + subgraph) client-side
+- Subgraph now hides non-relevant nodes/relations (display:none)
+- PDF export includes subgraph snapshot on second page
+- New headline block in Report: Likelihood + Evidence strength
+- html2canvas added via CDN for graph-to-PNG capture
 ```
 
 ——
 
-## Section 10 - If something is ambiguous
+## Section 7 - If something is ambiguous
 
-Match existing patterns in the repo. If the graph uses D3, keep D3. If it’s plain SVG, keep plain SVG. Minimal surgical change. Do not introduce new libraries except html2pdf.js (optional, for PDF export).
+Match existing patterns. Keep minimal. Do not introduce new libraries besides html2canvas. If html2pdf is already present, reuse it.
