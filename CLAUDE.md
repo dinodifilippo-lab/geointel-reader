@@ -67,9 +67,19 @@ come risposta report editoriali (AS IS / WHAT IF / Sensitivity) e la porzione
 di Knowledge Graph rilevante. Il dossier viene individuato automaticamente dal
 sistema in base alla domanda — l'utente non lo seleziona mai esplicitamente.
 
-Ogni domanda (o gruppo di domande correlate) produce una coppia (report #N,
-grafo #N). Le versioni precedenti restano accessibili dentro la conversazione
-via chip `↗ Report #N` / `↗ Graph #N`, senza dover uscire dalla chat.
+Il Reader **non è un browser di dossier con report statici**: è un **motore di
+proiezione dinamica**. L'utente pone una domanda in chat → un classifier
+(Haiku 4.5) la tipa → se è una domanda di scenario ben formata, chiede
+conferma all'utente → quando l'utente conferma ("sì, procedi"), un generator
+(Sonnet 4.5) produce un report analitico + lista di entità/archi del
+sottografo rilevante. Il frontend renderizza il report nel pannello centrale
+e evidenzia il sottografo nel pannello grafo. Ogni scenario generato produce
+una **scenario card cliccabile** in chat che lo richiama client-side, senza
+nuove chiamate al backend.
+
+Le versioni precedenti restano accessibili dentro la conversazione via le
+scenario card e/o chip `↗ Report #N` / `↗ Graph #N`, senza dover uscire
+dalla chat.
 
 Deve essere elegante, editoriale, leggibile su iPad e desktop.
 
@@ -78,25 +88,90 @@ Deve essere elegante, editoriale, leggibile su iPad e desktop.
 ## 4. Stack tecnologico
 
 - **Frontend**: HTML + CSS + JavaScript vanilla, no framework.
-- **Hosting**: Vercel (static site, zero-config).
+- **Hosting**: Vercel (static site, zero-config). Deploy automatico da `main`.
+  Dominio: `geointel-reader.vercel.app`.
 - **Dev environment**: iPad (Working Copy per git, Safari per preview, Claude
-  Codice per sviluppo).
-- **Struttura file**: 3 file di codice in root — `index.html` (shell + CSS),
-  `data.js` (dossier + brief per LLM context), `app.js` (logica). Il monolite
-  iniziale è stato splittato per gestibilità: non tornare indietro. Asset
-  dati (TopoJSON, GeoJSON, immagini) sono ammessi come file aggiuntivi: la
-  regola vale sul codice, non sui dati.
-- **Chat backend**: Supabase Edge Function `geointel-reader-chat` esposta su
+  Code app per sviluppo, Supabase dashboard per Edge Function).
+- **Struttura file**: 3 file di codice in root — `index.html` (shell + CSS +
+  CDN scripts), `data.js` (KG + dossier + brief per LLM context), `app.js`
+  (logica). Il monolite iniziale è stato splittato per gestibilità: non
+  tornare indietro. Asset dati (TopoJSON, GeoJSON, immagini, code spec)
+  sono ammessi come file aggiuntivi: la regola vale sul codice, non sui
+  dati.
+- **CDN runtime deps** (in `index.html`, `defer`): d3-force, html2canvas,
+  html2pdf — usati per subgraph force-directed layout e PDF snapshot.
+- **Chat backend**: Supabase Edge Function `geointel-reader-chat` (progetto
+  `chuvfdbpwiszjuoyhvlw.supabase.co`) esposta su
   `https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat`.
-  Il Reader la chiama con `Authorization: Bearer <SUPABASE_ANON_KEY>` e body
-  `{dossier_id, dossier_title, brief_text, question, history}`. La history
-  è capped a 20 turni, esclude il messaggio user appena inviato. La chiave
-  anon è un placeholder in `app.js` (`SUPABASE_ANON_KEY`) da incollare prima
-  di ogni deploy — è la chiave pubblica anon, safe per il frontend.
-- **Dataset dossier**: dalla v2.0.0 di `data.js` ogni dossier include un
-  campo `brief_text` (~8–15 KB) che è la memoria del dossier passata come
-  contesto all'LLM. Questo campo **non deve mai essere renderizzato nel
-  DOM**: è context-only.
+  Il Reader la chiama con `Authorization: Bearer <SUPABASE_ANON_KEY>`. La
+  chiave anon è un placeholder in `app.js` (`SUPABASE_ANON_KEY`) — è la
+  chiave pubblica anon, safe per il frontend. Il source dell'Edge Function
+  **vive solo in Supabase**, non nel repo (rimosso intenzionalmente).
+
+### 4.1 Contract frontend ↔ Edge Function
+
+**Request body** (POST JSON):
+
+```
+{
+  question: string,                        // domanda utente appena inviata
+  history: [{role, content}, ...],         // capped a CHAT_HISTORY_CAP turni, esclude la user msg corrente
+  kg: { entities: [...77], relations: [...77] },   // da window.CHESS_DATA.kg
+  dossier_index: [...],                    // built da buildDossierIndex()
+  current_scenario: null | {               // scenario attivo (ridotto) per continuità follow-up
+    question, entity_ids, relation_keys
+  }
+}
+```
+
+**Response body** (JSON tipizzato):
+
+```
+{
+  type: "welcome" | "clarification" | "ready_to_generate" | "scenario"
+      | "out_of_scope" | "acknowledge" | "scenario_followup",
+  message: string,
+  scenario?: {                             // solo se type === "scenario"
+    title, likelihood_label, likelihood_range,
+    user_question, report_html,
+    entity_ids: [...], relation_keys: [...]
+  },
+  debug?: {...}
+}
+```
+
+Note:
+
+- Il campo `evidence_strength` **non** è nell'output del generator (rimosso
+  in Edge v2.2). È calcolato client-side come media dei `confidence` dei
+  relations in `relation_keys`, e mostrato sia in Report headline che in
+  Intel panel (stesso numero, fonte unica).
+- Il generator supporta *structure A* (scenario singolo) o *structure B*
+  (biforcato tipo "base vs worst case") con selezione adattiva.
+- Il `report_html` è generato in inglese; `user_question` è preservato nella
+  lingua originale dell'utente.
+- `scenarioHistory` client-side (in `app.js`) è la verità sugli scenari
+  generati nella sessione; la recall da scenario card è 100% client-side
+  e non tocca la Edge Function.
+
+### 4.2 Dati (`data.js`)
+
+`data.js` contiene:
+
+- `window.CHESS_DATA.clusters`, `dossiers`, `trans_geographic_dossier_ids` —
+  struttura d'Atlas.
+- `window.CHESS_DATA.dossiers[<id>].brief_text` (~8–15 KB ciascuno) — memoria
+  del dossier, context-only per l'LLM. **Non deve mai essere renderizzato
+  nel DOM.**
+- `window.CHESS_DATA.kg = { entities: [...77], relations: [...77] }` — il
+  Knowledge Graph globale. Ogni relation ha: `from, to, type, weight` (0–1),
+  `polarity` (-1..+1), `volatility` (1–5), `reversibility` (1–5),
+  `confidence` (0–1), `dossiers` (array di dossier_id).
+
+**`data.js` è dato sorgente, non codice**: non va modificato nelle sessioni
+di sviluppo frontend. Modifiche a `data.js` avvengono solo via
+aggiornamento esplicito del dataset, versionate come bump di `data.js` (es.
+v2.0.0 → v2.1.0), mai come side-effect di un refactor UI.
 
 ---
 
@@ -226,3 +301,101 @@ Light editorial, non dark.
   trans-geografici.
 - **Context Factor**: testo annotato su un arco, che descrive condizioni o
   fattori che qualificano la relazione.
+
+---
+
+## 9. Stato corrente (aprile 2026)
+
+Questa sezione viene aggiornata a ogni milestone significativo. Contiene
+versioni correnti, feature attive e bug aperti.
+
+### 9.1 Versioni
+
+- **Frontend**: `app.js` v2.3.3, `index.html` v2.3.3.
+- **Dataset**: `data.js` v2.0.0 (KG 77 entities + 77 relations, brief_text
+  per 6 dossier: russia-ukraine, iran-hormuz, iran-usa, taiwan-strait,
+  ai-us-china, red-sea-houthi).
+- **Edge Function** `geointel-reader-chat`: v2.2 (two-phase
+  classifier+generator). Modelli: `claude-haiku-4-5-20251001` (classifier,
+  max_tokens 800), `claude-sonnet-4-5-20250929` (generator, max_tokens
+  5000).
+
+### 9.2 Feature attive lato frontend
+
+1. **Scenario projection mode** — chat → classifier → conferma utente →
+   generator → scenario (report + subgraph + scenario card).
+2. **`scenarioHistory[]` client-side** con `currentScenarioIndex`. Ogni
+   scenario produce una `.scenario-card` cliccabile in chat per recall
+   senza backend call.
+3. **Sottografo isolato** via `display: none` sugli elementi non
+   highlighted (non più `opacity` dim). Force-directed layout d3-force
+   sul sottografo attivo; Atlas / full-graph restano con il loro
+   layout originale.
+4. **PDF export** con snapshot del grafo: html2canvas + html2pdf, produce
+   PDF 2 pagine (Report + Subgraph). Fallback `window.print()` se i CDN
+   non si caricano.
+5. **Evidence strength unificato**: rimosso widget "Confidence" dall'Intel
+   panel, sostituito con "Evidence strength" calcolato client-side come
+   media dei `confidence` dei relations in `relation_keys`. Stesso numero
+   in Report headline e Intel panel.
+6. **User question** renderizzata come blockquote `.scenario-question`
+   dentro il Report.
+7. **Expand** preserva il sottografo (prima mostrava il grafo intero).
+8. **On-screen debug log** (v2.3.2): ring buffer di 40 entry mostrato in
+   un `<details>` nella chat panel, auto-apre quando `CHAT_ERROR` fa
+   fire. Necessario su iPad dove Web Inspector è off.
+9. **Fetch robustness** (v2.3.1): `AbortController` con timeout client-side
+   180 s; gestione response non-ok con body text surfaced nel chat; JSON
+   malformato trattato come EarlyDrop con errore visibile.
+
+### 9.3 Bug aperto — EarlyDrop su UI con KG completo
+
+**Sintomo**: dall'UI `vercel.app`, quando l'utente conferma "Procedi" dopo un
+`ready_to_generate`, la Edge Function fa shutdown con `reason: "EarlyDrop"`
+dopo **9 ms di CPU** usata. Il frontend resta appeso sul loader di
+generazione finché non scatta il timeout client (180 s).
+
+**Fatti accertati**:
+
+- Test panel Supabase, KG minimo (5 entities + 3 relations): ✅ 200,
+  ~5–10 s, 2410 input_tokens / 1561 output_tokens.
+- Test panel Supabase, KG vuoto: ✅ 200, ~5 s, 2059 input / 747 output.
+- UI vercel.app, KG completo (77 + 77): ❌ EarlyDrop, 9 ms CPU.
+- Credito Anthropic residuo OK (~36 USD), non è billing.
+- Sonnet 4.5 disponibile, non rate-limited.
+- Bump `MAX_TOKENS_GENERATOR` da 3000 a 5000: nessun effetto sul bug UI.
+- `Max duration` dell'Edge Function non esposto nel dashboard Supabase
+  Settings (solo Name + Verify JWT + Invoke function).
+
+**Ipotesi corrente**: 9 ms di CPU = function terminata praticamente dopo il
+boot, prima di chiamare Anthropic. Probabile rifiuto al parsing del body
+per dimensione o shape del payload. La differenza principale tra Test
+panel (funziona) e UI (fallisce) è il KG completo serializzato (77+77 con
+tutti i campi). Non è wall-clock timeout: sarebbe comparso con CPU
+consistente.
+
+**Diagnostica in place** (commit `c35db82`, `3ca6917`, `1fed845` — tutti
+su main):
+
+- `app.js:847–852` — pre-fetch: `PAYLOAD SIZE BYTES`, `PAYLOAD KEYS`,
+  `KG ENTITIES/RELATIONS COUNT`, `HISTORY LENGTH`,
+  `CURRENT_SCENARIO PRESENT`.
+- `app.js:876–878` — post-fetch: `RESPONSE STATUS`, `RESPONSE OK`,
+  `RESPONSE HEADERS`.
+- `app.js:907–909` — catch: `FETCH FAILED name/message/stack`.
+
+Tutti i log vengono mirrorati al pannello debug on-screen visibile
+nell'UI (v2.3.2), leggibile da iPad senza DevTools.
+
+**Prossimo step**: leggere il pannello debug dall'UI Vercel dopo un
+tentativo di "Procedi" per capire se la fetch riceve risposta (e quale
+status) o fallisce client-side; da lì diagnosticare se il problema è
+nella dimensione del payload, nella shape, o nel routing Supabase.
+
+### 9.4 Workflow iPad — memo
+
+- Branch di sviluppo assegnato da Claude Code app; merge su `main` via PR.
+- Working Copy: `Pull` (non solo `Fetch`) per aggiornare i file dopo merge.
+- Vercel deploya in automatico ogni push su `main`.
+- Per provare l'Edge Function in isolamento: Supabase Dashboard → Edge
+  Functions → `geointel-reader-chat` → Test panel.
