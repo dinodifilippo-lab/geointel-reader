@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GeoIntel Reader - Mock v11</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; }
+  body {
+    background: #f5f5f4;
+    padding: 20px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #0a0a0a;
+  }
+  .page-title {
+    max-width: 1280px;
+    margin: 0 auto 16px;
+    font-size: 14px;
+    color: #737373;
+  }
+  .page-title strong { color: #0a0a0a; font-weight: 600; }
+  .container {
+    max-width: 1280px;
+    margin: 0 auto 30px;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  .head {
+    padding: 16px 24px;
+    border-bottom: 1px solid #f0f0ef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+  }
+  .head-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .head-meta { font-size: 12px; color: #737373; display: flex; gap: 20px; }
+  .head-meta strong { color: #0a0a0a; font-weight: 600; margin-left: 4px; }
+  .graph-wrap { padding: 30px 20px; }
+  svg.graph { display: block; width: 100%; height: 720px; }
+  .legend-bar {
+    padding: 14px 30px;
+    border-top: 1px solid #f0f0ef;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 28px;
+    font-size: 11.5px;
+    color: #525252;
+    background: #fafafa;
+  }
+  .legend-bar .leg-section { display: flex; align-items: center; gap: 8px; }
+  .legend-bar .leg-section strong {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8a8a8a;
+    margin-right: 4px;
+    font-weight: 600;
+  }
+  .leg-item { display: flex; align-items: center; gap: 6px; }
+  details.glossary { border-top: 1px solid #f0f0ef; background: #fafafa; }
+  details.glossary summary {
+    padding: 13px 30px;
+    cursor: pointer;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #525252;
+    list-style: none;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  details.glossary summary::-webkit-details-marker { display: none; }
+  details.glossary summary::before { content: '+'; font-size: 16px; color: #999; }
+  details.glossary[open] summary::before { content: '-'; }
+  details.glossary summary:hover { background: #f0f0ef; }
+  .glossary-body {
+    padding: 4px 30px 20px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+  .glos-item { font-size: 11px; color: #525252; line-height: 1.5; }
+  .glos-item strong {
+    display: block;
+    color: #0a0a0a;
+    font-weight: 600;
+    font-size: 11.5px;
+    margin-bottom: 3px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title"><strong>Single-dossier</strong> &middot; Taiwan 2027-2030 (v11: callout far-search + accurate bbox)</div>
+<div class="container">
+  <div class="head">
+    <div class="head-title">China-Taiwan window 2027-2030</div>
+    <div class="head-meta">
+      <span>Apr 23, 2026</span>
+      <span>Likelihood<strong>40-60%</strong></span>
+      <span>Evidence<strong>0.79</strong></span>
+    </div>
+  </div>
+  <div class="graph-wrap"><svg id="svg-single" class="graph" viewBox="0 0 1280 720"></svg></div>
+  <div class="legend-bar">
+    <div class="leg-section">
+      <strong>Nodes</strong>
+      <div class="leg-item"><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#d1fae5" stroke="#10b981" stroke-width="1.3"/></svg>Actor</div>
+      <div class="leg-item"><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#fef3c7" stroke="#d97706" stroke-width="1.3"/></svg>Asset</div>
+    </div>
+    <div class="leg-section">
+      <strong>Edges</strong>
+      <div class="leg-item"><svg width="28" height="10"><line x1="2" y1="5" x2="20" y2="5" stroke="#ef4444" stroke-width="2.5" opacity="0.8"/><polygon points="20,2 26,5 20,8" fill="#ef4444"/></svg>Negative</div>
+      <div class="leg-item"><svg width="28" height="10"><line x1="2" y1="5" x2="20" y2="5" stroke="#10b981" stroke-width="2.5" opacity="0.8"/><polygon points="20,2 26,5 20,8" fill="#10b981"/></svg>Positive</div>
+      <div class="leg-item" style="color:#737373;">thickness = weight</div>
+    </div>
+    <div class="leg-section">
+      <strong>Volatility</strong>
+      <div class="leg-item"><span style="font-size:9.5px; padding:2px 6px; background:#fee2e2; color:#991b1b; border-radius:10px; font-weight:700;">H</span> High</div>
+      <div class="leg-item"><span style="font-size:9.5px; padding:2px 6px; background:#fef3c7; color:#92400e; border-radius:10px; font-weight:700;">M</span> Medium</div>
+      <div class="leg-item"><span style="font-size:9.5px; padding:2px 6px; background:#f0f0ef; color:#525252; border-radius:10px; font-weight:700;">L</span> Low</div>
+    </div>
+  </div>
+  <details class="glossary">
+    <summary>Mechanisms glossary</summary>
+    <div class="glossary-body">
+      <div class="glos-item"><strong>Coercion</strong>Direct pressure to bend the target's will.</div>
+      <div class="glos-item"><strong>Deterrence</strong>Forward posture raising the cost of aggressive action.</div>
+      <div class="glos-item"><strong>Enabling</strong>Indirect support that multiplies a partner's capability.</div>
+      <div class="glos-item"><strong>Basing</strong>Physical access to territory, ports, airfields.</div>
+      <div class="glos-item"><strong>Economic pressure</strong>Commercial and financial leverage.</div>
+    </div>
+  </details>
+</div>
+
+<div class="page-title"><strong>Multi-dossier</strong> &middot; Iran tensions &rarr; US-China rivalry &rarr; Russia-Ukraine spillover</div>
+<div class="container">
+  <div class="head">
+    <div class="head-title">Three-theater causal projection</div>
+    <div class="head-meta">
+      <span>Apr 23, 2026</span>
+      <span>Bridges<strong>4</strong></span>
+      <span>Theaters<strong>3</strong></span>
+    </div>
+  </div>
+  <div class="graph-wrap"><svg id="svg-multi" class="graph" viewBox="0 0 1280 720"></svg></div>
+  <div class="legend-bar">
+    <div class="leg-section">
+      <strong>Nodes</strong>
+      <div class="leg-item"><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#d1fae5" stroke="#10b981" stroke-width="1.3"/></svg>Actor</div>
+      <div class="leg-item"><svg width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="#fef3c7" stroke="#d97706" stroke-width="1.3"/></svg>Asset</div>
+    </div>
+    <div class="leg-section">
+      <strong>Edges</strong>
+      <div class="leg-item"><svg width="28" height="10"><line x1="2" y1="5" x2="20" y2="5" stroke="#ef4444" stroke-width="2.5" opacity="0.8"/><polygon points="20,2 26,5 20,8" fill="#ef4444"/></svg>Negative</div>
+      <div class="leg-item"><svg width="28" height="10"><line x1="2" y1="5" x2="20" y2="5" stroke="#10b981" stroke-width="2.5" opacity="0.8"/><polygon points="20,2 26,5 20,8" fill="#10b981"/></svg>Positive</div>
+      <div class="leg-item"><svg width="32" height="10"><line x1="2" y1="5" x2="24" y2="5" stroke="#b06030" stroke-width="2" stroke-dasharray="4,3"/><polygon points="24,2 30,5 24,8" fill="#b06030"/></svg>Bridge</div>
+    </div>
+    <div class="leg-section">
+      <strong>Territory</strong>
+      <div class="leg-item"><span style="padding:3px 8px; background:#fdf4ef; border:1px dashed #c0b890; border-radius:2px; font-size:10px; color:#8a5a35;">area tenue</span> = dossier</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function endpointOnCircle(cx, cy, r, tx, ty) {
+  const dx = tx - cx, dy = ty - cy;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.001) return { x: cx, y: cy };
+  return { x: cx + (dx / len) * r, y: cy + (dy / len) * r };
+}
+
+function drawCurvedEdge(svg, fromNode, toNode, opts) {
+  const { color, width, opacity, marker, curveAmt = 0, dashed = false } = opts;
+  const fromR = fromNode.r || 14;
+  const toR = toNode.r || 14;
+  const dx = toNode.x - fromNode.x, dy = toNode.y - fromNode.y;
+  const len = Math.hypot(dx, dy);
+  const midX = (fromNode.x + toNode.x) / 2, midY = (fromNode.y + toNode.y) / 2;
+  const perpX = -dy / len, perpY = dx / len;
+  const ctrlX = midX + perpX * curveAmt;
+  const ctrlY = midY + perpY * curveAmt;
+  const fromTarget = curveAmt !== 0 ? { x: ctrlX, y: ctrlY } : { x: toNode.x, y: toNode.y };
+  const toSource   = curveAmt !== 0 ? { x: ctrlX, y: ctrlY } : { x: fromNode.x, y: fromNode.y };
+  const p1 = endpointOnCircle(fromNode.x, fromNode.y, fromR + 2, fromTarget.x, fromTarget.y);
+  const p2 = endpointOnCircle(toNode.x,   toNode.y,   toR + 7,   toSource.x,   toSource.y);
+  const path = document.createElementNS(SVG_NS, 'path');
+  const d = curveAmt !== 0
+    ? `M ${p1.x} ${p1.y} Q ${ctrlX} ${ctrlY} ${p2.x} ${p2.y}`
+    : `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', width);
+  path.setAttribute('opacity', opacity);
+  if (dashed) path.setAttribute('stroke-dasharray', '6,4');
+  path.setAttribute('marker-end', 'url(#' + marker + ')');
+  svg.appendChild(path);
+  const mid = curveAmt !== 0
+    ? { x: 0.25 * p1.x + 0.5 * ctrlX + 0.25 * p2.x, y: 0.25 * p1.y + 0.5 * ctrlY + 0.25 * p2.y }
+    : { x: midX, y: midY };
+  return mid;
+}
+
+function bboxOverlap(a, b) {
+  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+}
+
+// FIX: range di distanze DIVERSO per callout (grandi, vanno lontano) e inline (piccole, vicine)
+function placeLabel(midX, midY, labelW, labelH, occupied, rangeType) {
+  const padding = 6;
+  const directions = [
+    {dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0},
+    {dx: -0.7, dy: -0.7}, {dx: 0.7, dy: -0.7}, {dx: -0.7, dy: 0.7}, {dx: 0.7, dy: 0.7}
+  ];
+  // FIX CHIAVE: callout = range lungo, inline = range corto
+  const distances = rangeType === 'callout'
+    ? [55, 85, 115, 150, 190, 230]
+    : [16, 26, 38, 52, 70];
+  for (const dist of distances) {
+    for (const dir of directions) {
+      const cx = midX + dir.dx * dist;
+      const cy = midY + dir.dy * dist;
+      const bbox = { x: cx - labelW/2 - padding, y: cy - labelH/2 - padding, w: labelW + padding*2, h: labelH + padding*2 };
+      let conflict = false;
+      for (const occ of occupied) {
+        if (bboxOverlap(bbox, occ)) { conflict = true; break; }
+      }
+      if (!conflict) {
+        occupied.push(bbox);
+        return { x: cx, y: cy };
+      }
+    }
+  }
+  return null;
+}
+
+function makeDefs(svg, markers) {
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  markers.forEach(m => {
+    defs.innerHTML += `
+      <marker id="${m.id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="${m.color}" opacity="${m.opacity || 1}"/>
+      </marker>
+    `;
+  });
+  svg.appendChild(defs);
+}
+
+function drawNode(svg, node) {
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('transform', `translate(${node.x},${node.y})`);
+  const c = document.createElementNS(SVG_NS, 'circle');
+  c.setAttribute('r', node.r);
+  c.setAttribute('fill', node.fill);
+  c.setAttribute('stroke', node.stroke);
+  c.setAttribute('stroke-width', 1.8);
+  g.appendChild(c);
+  const t1 = document.createElementNS(SVG_NS, 'text');
+  t1.setAttribute('y', node.r + 14);
+  t1.setAttribute('text-anchor', 'middle');
+  t1.setAttribute('font-family', 'Inter, sans-serif');
+  t1.setAttribute('font-size', '12.5');
+  t1.setAttribute('font-weight', '600');
+  t1.setAttribute('fill', '#0a0a0a');
+  t1.textContent = node.main;
+  g.appendChild(t1);
+  const t2 = document.createElementNS(SVG_NS, 'text');
+  t2.setAttribute('y', node.r + 27);
+  t2.setAttribute('text-anchor', 'middle');
+  t2.setAttribute('font-family', 'Inter, sans-serif');
+  t2.setAttribute('font-size', '10');
+  t2.setAttribute('fill', '#999');
+  t2.textContent = node.sub;
+  g.appendChild(t2);
+  svg.appendChild(g);
+}
+
+function drawInlineLabel(svg, pos, text, color) {
+  if (!pos) return;
+  const t = document.createElementNS(SVG_NS, 'text');
+  t.setAttribute('x', pos.x);
+  t.setAttribute('y', pos.y);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('font-family', 'Inter, sans-serif');
+  t.setAttribute('font-size', '10');
+  t.setAttribute('font-style', 'italic');
+  t.setAttribute('font-weight', '500');
+  t.setAttribute('fill', color || '#a0a0a0');
+  t.textContent = text;
+  svg.appendChild(t);
+  const bb = t.getBBox();
+  const bg = document.createElementNS(SVG_NS, 'rect');
+  bg.setAttribute('x', bb.x - 3);
+  bg.setAttribute('y', bb.y - 1);
+  bg.setAttribute('width', bb.width + 6);
+  bg.setAttribute('height', bb.height + 2);
+  bg.setAttribute('fill', '#ffffff');
+  bg.setAttribute('opacity', '0.92');
+  svg.insertBefore(bg, t);
+}
+
+function drawCallout(svg, anchorX, anchorY, labelPos, num, mech, vol, isBridge) {
+  if (!labelPos) return;
+  const volColors = {
+    H: { bg: '#fee2e2', fg: '#991b1b' },
+    M: { bg: '#fef3c7', fg: '#92400e' },
+    L: { bg: '#f0f0ef', fg: '#525252' }
+  };
+  const boxW = 140, boxH = 30;
+  const bx = labelPos.x - boxW/2;
+  const by = labelPos.y - boxH/2;
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('x1', anchorX);
+  line.setAttribute('y1', anchorY);
+  line.setAttribute('x2', labelPos.x);
+  line.setAttribute('y2', by + boxH/2);
+  line.setAttribute('stroke', isBridge ? '#b06030' : '#9a9a98');
+  line.setAttribute('stroke-width', 0.8);
+  line.setAttribute('stroke-dasharray', '3,3');
+  svg.appendChild(line);
+  const rect = document.createElementNS(SVG_NS, 'rect');
+  rect.setAttribute('x', bx);
+  rect.setAttribute('y', by);
+  rect.setAttribute('width', boxW);
+  rect.setAttribute('height', boxH);
+  rect.setAttribute('rx', 4);
+  rect.setAttribute('fill', isBridge ? '#fdf5e6' : '#ffffff');
+  rect.setAttribute('stroke', isBridge ? '#b06030' : '#0a0a0a');
+  rect.setAttribute('stroke-width', 1.3);
+  svg.appendChild(rect);
+  const badge = document.createElementNS(SVG_NS, 'circle');
+  badge.setAttribute('cx', bx + 15);
+  badge.setAttribute('cy', by + boxH/2);
+  badge.setAttribute('r', 9);
+  badge.setAttribute('fill', isBridge ? '#b06030' : '#0a0a0a');
+  svg.appendChild(badge);
+  const bt = document.createElementNS(SVG_NS, 'text');
+  bt.setAttribute('x', bx + 15);
+  bt.setAttribute('y', by + boxH/2 + 3.5);
+  bt.setAttribute('text-anchor', 'middle');
+  bt.setAttribute('font-family', 'Inter, sans-serif');
+  bt.setAttribute('font-size', '10');
+  bt.setAttribute('font-weight', '700');
+  bt.setAttribute('fill', '#ffffff');
+  bt.textContent = num;
+  svg.appendChild(bt);
+  const lt = document.createElementNS(SVG_NS, 'text');
+  lt.setAttribute('x', bx + 31);
+  lt.setAttribute('y', by + boxH/2 + 3);
+  lt.setAttribute('font-family', 'Inter, sans-serif');
+  lt.setAttribute('font-size', '11');
+  lt.setAttribute('font-weight', '600');
+  lt.setAttribute('fill', '#0a0a0a');
+  lt.textContent = mech;
+  svg.appendChild(lt);
+  if (vol) {
+    const vc = volColors[vol];
+    const pill = document.createElementNS(SVG_NS, 'rect');
+    pill.setAttribute('x', bx + boxW - 24);
+    pill.setAttribute('y', by + boxH/2 - 6);
+    pill.setAttribute('width', 16);
+    pill.setAttribute('height', 12);
+    pill.setAttribute('rx', 6);
+    pill.setAttribute('fill', vc.bg);
+    svg.appendChild(pill);
+    const vt = document.createElementNS(SVG_NS, 'text');
+    vt.setAttribute('x', bx + boxW - 16);
+    vt.setAttribute('y', by + boxH/2 + 3);
+    vt.setAttribute('text-anchor', 'middle');
+    vt.setAttribute('font-family', 'Inter, sans-serif');
+    vt.setAttribute('font-size', '9');
+    vt.setAttribute('font-weight', '700');
+    vt.setAttribute('fill', vc.fg);
+    vt.textContent = vol;
+    svg.appendChild(vt);
+  }
+}
+
+// FIX: bbox accurato per ogni nodo, includendo label sottostante stimata
+function computeNodeBBox(node) {
+  const mainLen = (node.main || '').length;
+  const subLen = (node.sub || '').length;
+  const maxTextW = Math.max(mainLen * 7.2, subLen * 6.2);
+  const w = Math.max(node.r * 2, maxTextW);
+  const h = node.r * 2 + 34; // cerchio + nome + sub
+  return {
+    x: node.x - w/2 - 6,
+    y: node.y - node.r - 6,
+    w: w + 12,
+    h: h + 12
+  };
+}
+
+// ========================================================
+//  SINGLE-DOSSIER (nodi riposizionati con piu aria, viewport 1280x720)
+// ========================================================
+const singleNodes = [
+  { id: 'china',     x: 180, y: 490, r: 14, fill: '#fee2e2', stroke: '#ef4444', main: 'China',               sub: "People's Republic" },
+  { id: 'pla',       x: 370, y: 330, r: 12, fill: '#fee2e2', stroke: '#ef4444', main: 'PLA Eastern Theater', sub: 'theater command' },
+  { id: 'taiwan',    x: 630, y: 410, r: 16, fill: '#e0e7ff', stroke: '#4f46e5', main: 'Taiwan',              sub: 'Republic of China' },
+  { id: 'indopacom', x: 170, y: 170, r: 12, fill: '#d1fae5', stroke: '#10b981', main: 'US INDOPACOM',        sub: 'Indo-Pacific Command' },
+  { id: 'usa',       x: 600, y: 170, r: 14, fill: '#d1fae5', stroke: '#10b981', main: 'United States',       sub: 'federal government' },
+  { id: 'tsmc',      x: 1050, y: 200, r: 12, fill: '#fef3c7', stroke: '#d97706', main: 'TSMC',               sub: 'Taiwan Semiconductor' },
+  { id: 'japan',     x: 960, y: 350, r: 12, fill: '#d1fae5', stroke: '#10b981', main: 'Japan SDF',           sub: 'Self-Defense Forces' },
+  { id: 'phil',      x: 870, y: 620, r: 12, fill: '#d1fae5', stroke: '#10b981', main: 'Philippines',         sub: 'EDCA host nation' },
+  { id: 'cables',    x: 170, y: 640, r: 10, fill: '#fef3c7', stroke: '#d97706', main: 'Taiwan cables',       sub: 'infrastructure' },
+  { id: 'fleet7',    x: 1130, y: 540, r: 11, fill: '#d1fae5', stroke: '#10b981', main: 'US 7th Fleet',       sub: 'Pacific naval force' },
+  { id: 'luzon',     x: 1180, y: 650, r: 9,  fill: '#fef3c7', stroke: '#d97706', main: 'Luzon Strait',       sub: 'chokepoint' }
+];
+
+const singleEdges = [
+  { from: 'pla',       to: 'taiwan', pol: -1, w: 0.9,  label: 'coercion',      critical: { num: 1, mech: 'Coercion',          vol: 'H' }, curve: 0 },
+  { from: 'indopacom', to: 'china',  pol: -1, w: 0.75, label: 'deterrence',    critical: { num: 2, mech: 'Deterrence',        vol: 'M' }, curve: -50 },
+  { from: 'japan',     to: 'taiwan', pol: +1, w: 0.7,  label: 'enabling',      critical: { num: 3, mech: 'Enabling',          vol: 'M' }, curve: 0 },
+  { from: 'phil',      to: 'taiwan', pol: +1, w: 0.55, label: 'basing',        critical: { num: 4, mech: 'Basing',            vol: 'L' }, curve: 0 },
+  { from: 'china',     to: 'taiwan', pol: -1, w: 0.6,  label: 'econ pressure', critical: { num: 5, mech: 'Economic pressure', vol: 'M' }, curve: 80 },
+  { from: 'china',     to: 'pla',       pol: +1, w: 0.85, label: 'command',       curve: 0 },
+  { from: 'china',     to: 'cables',    pol: -1, w: 0.4,  label: 'sabotage',      curve: 0 },
+  { from: 'usa',       to: 'indopacom', pol: +1, w: 0.75, label: 'command chain', curve: 0 },
+  { from: 'usa',       to: 'fleet7',    pol: +1, w: 0.7,  label: 'naval command', curve: 0 },
+  { from: 'usa',       to: 'japan',     pol: +1, w: 0.7,  label: 'alliance',      curve: 0 },
+  { from: 'usa',       to: 'phil',      pol: +1, w: 0.55, label: 'treaty',        curve: -60 },
+  { from: 'usa',       to: 'taiwan',    pol: +1, w: 0.75, label: 'support',       curve: 0 },
+  { from: 'usa',       to: 'tsmc',      pol: +1, w: 0.55, label: 'investment',    curve: 0 },
+  { from: 'tsmc',      to: 'taiwan',    pol: +1, w: 0.85, label: 'dependency',    curve: 0 },
+  { from: 'fleet7',    to: 'luzon',     pol: +1, w: 0.5,  label: 'presence',      curve: 0 }
+];
+
+function renderGraph(svgId, nodes, edges, opts = {}) {
+  const svg = document.getElementById(svgId);
+  svg.innerHTML = '';
+  makeDefs(svg, [
+    { id: svgId + '-ar-r',  color: '#ef4444' },
+    { id: svgId + '-ar-g',  color: '#10b981' },
+    { id: svgId + '-ar-br', color: '#b06030' }
+  ]);
+  const nodeById = {};
+  nodes.forEach(n => { nodeById[n.id] = n; });
+  const occupied = [];
+  // FIX: bbox nodi accurato
+  nodes.forEach(n => { occupied.push(computeNodeBBox(n)); });
+  if (opts.territories) {
+    opts.territories.forEach(t => {
+      occupied.push({ x: t.x, y: t.y, w: t.w, h: 30 });
+    });
+    opts.territories.forEach(t => {
+      const rect = document.createElementNS(SVG_NS, 'rect');
+      rect.setAttribute('x', t.x);
+      rect.setAttribute('y', t.y);
+      rect.setAttribute('width', t.w);
+      rect.setAttribute('height', t.h);
+      rect.setAttribute('rx', 8);
+      rect.setAttribute('fill', t.fill);
+      rect.setAttribute('stroke', t.stroke);
+      rect.setAttribute('stroke-width', 1);
+      rect.setAttribute('stroke-dasharray', '4,3');
+      svg.appendChild(rect);
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', t.x + 20);
+      label.setAttribute('y', t.y + 22);
+      label.setAttribute('font-family', 'Inter, sans-serif');
+      label.setAttribute('font-size', '10');
+      label.setAttribute('font-weight', '700');
+      label.setAttribute('letter-spacing', '2');
+      label.setAttribute('fill', t.labelColor);
+      label.textContent = t.name.toUpperCase();
+      svg.appendChild(label);
+    });
+  }
+  const midpoints = [];
+  edges.forEach((e) => {
+    const fn = nodeById[e.from];
+    const tn = nodeById[e.to];
+    if (!fn || !tn) return;
+    const isBridge = !!e.bridge;
+    const color = isBridge ? '#b06030' : (e.pol < 0 ? '#ef4444' : '#10b981');
+    const markerId = isBridge ? svgId + '-ar-br' : (e.pol < 0 ? svgId + '-ar-r' : svgId + '-ar-g');
+    const width = 1 + e.w * 3.4;
+    const opacity = isBridge ? 0.85 : (e.critical ? 0.9 : 0.55);
+    const mid = drawCurvedEdge(svg, fn, tn, {
+      color, width, opacity, marker: markerId, curveAmt: e.curve || 0, dashed: isBridge
+    });
+    midpoints.push({ edge: e, mid });
+  });
+  // Callout critici piazzati con range FAR
+  midpoints.forEach(({ edge, mid }) => {
+    if (!edge.critical) return;
+    const pos = placeLabel(mid.x, mid.y, 140, 30, occupied, 'callout');
+    drawCallout(svg, mid.x, mid.y, pos, edge.critical.num, edge.critical.mech, edge.critical.vol, !!edge.bridge);
+  });
+  // Inline label con range vicino
+  midpoints.forEach(({ edge, mid }) => {
+    if (edge.critical) return;
+    const labelW = edge.label.length * 5.4 + 6;
+    const labelH = 12;
+    const pos = placeLabel(mid.x, mid.y, labelW, labelH, occupied, 'inline');
+    drawInlineLabel(svg, pos, edge.label, edge.bridge ? '#8a5a35' : '#a0a0a0');
+  });
+  nodes.forEach(n => drawNode(svg, n));
+}
+
+renderGraph('svg-single', singleNodes, singleEdges);
+
+// ========================================================
+//  MULTI-DOSSIER
+// ========================================================
+const multiTerritories = [
+  { name: 'Middle East',    x: 40,  y: 80,  w: 380, h: 290, fill: '#fdf4ef', stroke: '#e4c8ae', labelColor: '#8a5a35' },
+  { name: 'Eastern Europe', x: 860, y: 80,  w: 380, h: 290, fill: '#eef2f8', stroke: '#b8c4d4', labelColor: '#47557a' },
+  { name: 'Indo-Pacific',   x: 260, y: 420, w: 760, h: 280, fill: '#f0f5ec', stroke: '#c4d4b4', labelColor: '#4a6438' }
+];
+const multiNodes = [
+  { id: 'iran',    x: 140, y: 230, r: 13, fill: '#fee2e2', stroke: '#ef4444', main: 'Iran',          sub: 'Islamic Republic' },
+  { id: 'israel',  x: 320, y: 200, r: 11, fill: '#fee2e2', stroke: '#ef4444', main: 'Israel',        sub: 'state' },
+  { id: 'hormuz',  x: 130, y: 330, r: 9,  fill: '#fef3c7', stroke: '#d97706', main: 'Hormuz Strait', sub: 'oil chokepoint' },
+  { id: 'proxies', x: 340, y: 300, r: 9,  fill: '#fef3c7', stroke: '#d97706', main: 'Iran proxies',  sub: 'Houthi, Hezbollah' },
+  { id: 'russia',  x: 1140, y: 220, r: 13, fill: '#fee2e2', stroke: '#ef4444', main: 'Russia',       sub: 'Federation' },
+  { id: 'ukraine', x: 960, y: 210, r: 11, fill: '#d1fae5', stroke: '#10b981', main: 'Ukraine',       sub: 'state at war' },
+  { id: 'nato',    x: 950, y: 325, r: 11, fill: '#d1fae5', stroke: '#10b981', main: 'NATO',          sub: 'Atlantic alliance' },
+  { id: 'china',   x: 360, y: 560, r: 13, fill: '#fee2e2', stroke: '#ef4444', main: 'China',         sub: "People's Republic" },
+  { id: 'taiwan',  x: 640, y: 540, r: 14, fill: '#e0e7ff', stroke: '#4f46e5', main: 'Taiwan',        sub: 'Republic of China' },
+  { id: 'usa',     x: 920, y: 565, r: 13, fill: '#d1fae5', stroke: '#10b981', main: 'United States', sub: 'federal government' }
+];
+const multiEdges = [
+  { from: 'iran',    to: 'israel',  pol: -1, w: 0.8,  label: 'pressure', critical: { num: 1, mech: 'Direct pressure', vol: 'H' }, curve: 0 },
+  { from: 'iran',    to: 'hormuz',  pol: +1, w: 0.6,  label: 'control',                                                          curve: 0 },
+  { from: 'iran',    to: 'proxies', pol: +1, w: 0.65, label: 'arming',                                                           curve: 0 },
+  { from: 'russia',  to: 'ukraine', pol: -1, w: 0.92, label: 'kinetic',  critical: { num: 2, mech: 'Kinetic war',     vol: 'H' }, curve: 0 },
+  { from: 'nato',    to: 'ukraine', pol: +1, w: 0.7,  label: 'aid',                                                              curve: 0 },
+  { from: 'russia',  to: 'nato',    pol: -1, w: 0.6,  label: 'pressure',                                                         curve: 0 },
+  { from: 'china',   to: 'taiwan',  pol: -1, w: 0.9,  label: 'coercion', critical: { num: 3, mech: 'Coercion',        vol: 'H' }, curve: 0 },
+  { from: 'usa',     to: 'taiwan',  pol: +1, w: 0.75, label: 'support',                                                          curve: 0 },
+  { from: 'usa',     to: 'china',   pol: -1, w: 0.8,  label: 'rivalry',                                                          curve: 60 },
+  { from: 'iran',    to: 'russia',  pol: +1, w: 0.6, label: 'axis',       bridge: true, critical: { num: 'B1', mech: 'Iran-Russia axis', vol: null }, curve: -160 },
+  { from: 'russia',  to: 'china',   pol: +1, w: 0.6, label: 'alignment',  bridge: true, critical: { num: 'B2', mech: 'RU-CN alignment',  vol: null }, curve: 220 },
+  { from: 'iran',    to: 'china',   pol: +1, w: 0.5, label: 'oil',        bridge: true, critical: { num: 'B3', mech: 'Oil dependency',   vol: null }, curve: -180 },
+  { from: 'usa',     to: 'nato',    pol: +1, w: 0.6, label: 'commitment', bridge: true, critical: { num: 'B4', mech: 'US commitment',    vol: null }, curve: -80 }
+];
+
+renderGraph('svg-multi', multiNodes, multiEdges, { territories: multiTerritories });
+</script>
+
+</body>
+</html>
