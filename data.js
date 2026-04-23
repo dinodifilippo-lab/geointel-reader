@@ -1,5 +1,15 @@
-// GeoIntel Reader · data.js · v2.0.0
+// GeoIntel Reader · data.js · v2.1.0
 // --------------------------------------------------
+// Changes vs v2.0.0:
+//   • entity.dossiers canonicalized: derived strictly from relations.dossiers
+//     (entity in D iff it appears in any relation tagged D). 23 entity lines
+//     rewritten: 12 had their declared set adjusted plus deterministic
+//     alphabetical sort; 11 orphan entities (no relations reference them)
+//     now have dossiers: []. Orphans today: ukmto, kharg-terminal, e3,
+//     natanz, fordow, skorea, euv-lithography, duv-lithography, hbm-memory,
+//     egypt, horn-africa-bases. Restore their dossier membership by adding
+//     relations that reference them, not by re-curating this field.
+//
 // Changes vs v1.0.0:
 //   • All 6 dossiers rewritten from scratch: Russia-Ukraine, Iran-Hormuz,
 //     Iran-USA, Taiwan-Strait, AI-US-China, Red-Sea-Houthis.
@@ -1010,15 +1020,15 @@ window.CHESS_DATA.kg = {
 
 entities: [
 // –– Russia-Ukraine ––
-{ id: "russia",           label: "Russia",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine", "ai-us-china"] },
+{ id: "russia",           label: "Russia",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["ai-us-china", "iran-usa", "russia-ukraine"] },
 { id: "ukraine",          label: "Ukraine",             type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
-{ id: "usa",              label: "United States",       type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine", "iran-usa", "taiwan-strait", "ai-us-china", "red-sea-houthis"] },
+{ id: "usa",              label: "United States",       type: "actor", subtype: "state",     cluster: null,             dossiers: ["ai-us-china", "iran-usa", "red-sea-houthis", "russia-ukraine", "taiwan-strait"] },
 { id: "germany",          label: "Germany",             type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
 { id: "poland",           label: "Poland",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
-{ id: "uk",               label: "United Kingdom",      type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine", "red-sea-houthis"] },
+{ id: "uk",               label: "United Kingdom",      type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine"] },
 { id: "france",           label: "France",              type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
-{ id: "china",            label: "China (PRC)",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["russia-ukraine", "iran-usa", "taiwan-strait", "ai-us-china"] },
-{ id: "turkey",           label: "Turkey",              type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine", "iran-usa"] },
+{ id: "china",            label: "China (PRC)",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["ai-us-china", "iran-hormuz", "iran-usa", "red-sea-houthis", "russia-ukraine", "taiwan-strait"] },
+{ id: "turkey",           label: "Turkey",              type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine"] },
 { id: "india",            label: "India",               type: "actor", subtype: "state",     cluster: null,             dossiers: ["russia-ukraine"] },
 { id: "hungary-slovakia", label: "Hungary / Slovakia",  type: "actor", subtype: "state",     cluster: "eastern-europe", dossiers: ["russia-ukraine"] },
 { id: "nato",             label: "NATO",                type: "actor", subtype: "alliance",  cluster: null,             dossiers: ["russia-ukraine"] },
@@ -1032,16 +1042,16 @@ entities: [
 // ---- Iran-Hormuz ----
 { id: "iran",             label: "Iran (State)",        type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa", "red-sea-houthis"] },
 { id: "irgc-navy",        label: "IRGC-Navy",           type: "actor", subtype: "military",  cluster: "middle-east",    dossiers: ["iran-hormuz"] },
-{ id: "us-5th-fleet",     label: "US 5th Fleet",        type: "actor", subtype: "military",  cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa"] },
-{ id: "ukmto",            label: "UKMTO",               type: "actor", subtype: "coord",     cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "us-5th-fleet",     label: "US 5th Fleet",        type: "actor", subtype: "military",  cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "ukmto",            label: "UKMTO",               type: "actor", subtype: "coord",     cluster: "middle-east",    dossiers: [] },
 { id: "gcc",              label: "GCC bloc",            type: "actor", subtype: "alliance",  cluster: "middle-east",    dossiers: ["iran-hormuz"] },
-{ id: "saudi-arabia",     label: "Saudi Arabia",        type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-usa", "red-sea-houthis"] },
+{ id: "saudi-arabia",     label: "Saudi Arabia",        type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz", "red-sea-houthis"] },
 { id: "qatar",            label: "Qatar",               type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-usa"] },
-{ id: "uae",              label: "UAE",                 type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz", "iran-usa"] },
+{ id: "uae",              label: "UAE",                 type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["iran-hormuz"] },
 { id: "commercial-shipping", label: "Commercial shipping", type: "asset", subtype: "logistics", cluster: "middle-east", dossiers: ["iran-hormuz", "red-sea-houthis"] },
 { id: "lloyds-market",    label: "Lloyd's insurance market", type: "asset", subtype: "finance", cluster: null,        dossiers: ["iran-hormuz", "red-sea-houthis"] },
-{ id: "hormuz",           label: "Strait of Hormuz",    type: "asset", subtype: "chokepoint", cluster: "middle-east",    dossiers: ["iran-hormuz"] },
-{ id: "kharg-terminal",   label: "Kharg Oil Terminal",  type: "asset", subtype: "energy",    cluster: "middle-east",    dossiers: ["iran-hormuz"] },
+{ id: "hormuz",           label: "Strait of Hormuz",    type: "asset", subtype: "chokepoint", cluster: "middle-east",    dossiers: ["iran-hormuz", "red-sea-houthis"] },
+{ id: "kharg-terminal",   label: "Kharg Oil Terminal",  type: "asset", subtype: "energy",    cluster: "middle-east",    dossiers: [] },
 { id: "gulf-gnss",        label: "Gulf GNSS infrastructure", type: "asset", subtype: "infrastructure", cluster: "middle-east", dossiers: ["iran-hormuz"] },
 { id: "ksa-eastwest-pipeline", label: "Saudi East-West Pipeline", type: "asset", subtype: "energy", cluster: "middle-east", dossiers: ["iran-hormuz", "red-sea-houthis"] },
 { id: "uae-fujairah-bypass", label: "UAE Fujairah pipeline bypass", type: "asset", subtype: "energy", cluster: "middle-east", dossiers: ["iran-hormuz"] },
@@ -1052,10 +1062,10 @@ entities: [
 { id: "hamas",            label: "Hamas",               type: "actor", subtype: "non-state", cluster: "middle-east",    dossiers: ["iran-usa"] },
 { id: "houthi",           label: "Ansar Allah (Houthi)", type: "actor", subtype: "non-state", cluster: "middle-east", dossiers: ["iran-usa", "red-sea-houthis"] },
 { id: "iraqi-militias",   label: "Iraqi militias",      type: "actor", subtype: "non-state", cluster: "middle-east",    dossiers: ["iran-usa"] },
-{ id: "e3",               label: "E3 (UK/FR/DE)",       type: "actor", subtype: "alliance",  cluster: null,             dossiers: ["iran-usa"] },
+{ id: "e3",               label: "E3 (UK/FR/DE)",       type: "actor", subtype: "alliance",  cluster: null,             dossiers: [] },
 { id: "iran-nuclear",     label: "Iranian nuclear programme", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: ["iran-usa"] },
-{ id: "natanz",           label: "Natanz enrichment facility", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: ["iran-usa"] },
-{ id: "fordow",           label: "Fordow enrichment facility", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: ["iran-usa"] },
+{ id: "natanz",           label: "Natanz enrichment facility", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: [] },
+{ id: "fordow",           label: "Fordow enrichment facility", type: "asset", subtype: "nuclear", cluster: "middle-east", dossiers: [] },
 { id: "post-assad-syria", label: "Post-Assad Syria",    type: "asset", subtype: "territory", cluster: "middle-east",    dossiers: ["iran-usa"] },
 
 // ---- Taiwan Strait ----
@@ -1065,11 +1075,11 @@ entities: [
 { id: "japan-sdf",        label: "Japan SDF",           type: "actor", subtype: "military",  cluster: "east-asia",      dossiers: ["taiwan-strait"] },
 { id: "philippines",      label: "Philippines",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait"] },
 { id: "australia",        label: "Australia",           type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait"] },
-{ id: "skorea",           label: "South Korea",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: ["taiwan-strait", "ai-us-china"] },
-{ id: "tsmc",             label: "TSMC",                type: "asset", subtype: "corporate", cluster: "east-asia",      dossiers: ["taiwan-strait", "ai-us-china"] },
+{ id: "skorea",           label: "South Korea",         type: "actor", subtype: "state",     cluster: "east-asia",      dossiers: [] },
+{ id: "tsmc",             label: "TSMC",                type: "asset", subtype: "corporate", cluster: "east-asia",      dossiers: ["ai-us-china", "taiwan-strait"] },
 { id: "taiwan-subsea-cables", label: "Taiwan subsea cables", type: "asset", subtype: "infrastructure", cluster: "east-asia", dossiers: ["taiwan-strait"] },
 { id: "us-7th-fleet",     label: "US 7th Fleet",        type: "asset", subtype: "military",  cluster: "east-asia",      dossiers: ["taiwan-strait"] },
-{ id: "rare-earths",      label: "Rare earths supply chain", type: "asset", subtype: "materials", cluster: null,       dossiers: ["taiwan-strait", "ai-us-china"] },
+{ id: "rare-earths",      label: "Rare earths supply chain", type: "asset", subtype: "materials", cluster: null,       dossiers: ["ai-us-china", "taiwan-strait"] },
 { id: "luzon-strait",     label: "Luzon Strait",        type: "asset", subtype: "chokepoint", cluster: "east-asia",     dossiers: ["taiwan-strait"] },
 
 // ---- AI US-China ----
@@ -1082,21 +1092,21 @@ entities: [
 { id: "deepseek",         label: "DeepSeek & Chinese labs", type: "actor", subtype: "corporate", cluster: "east-asia",  dossiers: ["ai-us-china"] },
 { id: "samsung-hynix",    label: "Samsung / SK Hynix",  type: "actor", subtype: "corporate",  cluster: "east-asia",      dossiers: ["ai-us-china"] },
 { id: "netherlands",      label: "Netherlands",         type: "actor", subtype: "state",      cluster: null,             dossiers: ["ai-us-china"] },
-{ id: "euv-lithography",  label: "EUV lithography",     type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china"] },
-{ id: "duv-lithography",  label: "Advanced DUV lithography", type: "asset", subtype: "technology", cluster: null,       dossiers: ["ai-us-china"] },
-{ id: "hbm-memory",       label: "HBM memory",          type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china"] },
-{ id: "frontier-models",  label: "Frontier AI models",  type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china"] },
+{ id: "euv-lithography",  label: "EUV lithography",     type: "asset", subtype: "technology", cluster: null,             dossiers: [] },
+{ id: "duv-lithography",  label: "Advanced DUV lithography", type: "asset", subtype: "technology", cluster: null,       dossiers: [] },
+{ id: "hbm-memory",       label: "HBM memory",          type: "asset", subtype: "technology", cluster: null,             dossiers: [] },
+{ id: "frontier-models",  label: "Frontier AI models",  type: "asset", subtype: "technology", cluster: null,             dossiers: ["ai-us-china", "taiwan-strait"] },
 
 // ---- Red Sea / Houthi ----
 { id: "prosperity-guardian", label: "Prosperity Guardian coalition", type: "actor", subtype: "alliance", cluster: "middle-east", dossiers: ["red-sea-houthis"] },
 { id: "eu-aspides",       label: "EU Operation Aspides", type: "actor", subtype: "alliance",  cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
-{ id: "egypt",            label: "Egypt",               type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
+{ id: "egypt",            label: "Egypt",               type: "actor", subtype: "state",     cluster: "middle-east",    dossiers: [] },
 { id: "bab-el-mandeb",    label: "Bab-el-Mandeb",       type: "asset", subtype: "chokepoint", cluster: "middle-east",   dossiers: ["red-sea-houthis"] },
 { id: "suez",             label: "Suez Canal",          type: "asset", subtype: "chokepoint", cluster: "middle-east",   dossiers: ["red-sea-houthis"] },
 { id: "europe-asia-shipping", label: "Europe-Asia shipping lanes", type: "asset", subtype: "logistics", cluster: null, dossiers: ["red-sea-houthis"] },
 { id: "egyptian-fx",      label: "Egyptian FX reserves", type: "asset", subtype: "finance",  cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
 { id: "hodeidah",         label: "Hodeidah port",       type: "asset", subtype: "logistics", cluster: "middle-east",    dossiers: ["red-sea-houthis"] },
-{ id: "horn-africa-bases", label: "Horn of Africa bases", type: "asset", subtype: "military", cluster: "middle-east",   dossiers: ["red-sea-houthis"] }
+{ id: "horn-africa-bases", label: "Horn of Africa bases", type: "asset", subtype: "military", cluster: "middle-east",   dossiers: [] }
 
 ],
 
