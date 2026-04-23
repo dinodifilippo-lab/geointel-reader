@@ -1531,6 +1531,7 @@ try {
 graphPng = await snapshotGraphAsPng(graphEl);
 } catch (err) {
 console.warn("Graph snapshot failed:", err);
+if (typeof debugLog === "function") debugLog("PDF GRAPH SNAPSHOT FAIL:", err && err.message ? err.message : String(err));
 }
 const reportBody = reportEl.outerHTML;
 const snapshotBlock = graphPng
@@ -1557,38 +1558,98 @@ jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
 }
 
 async function snapshotGraphAsPng(graphEl) {
+// v2.4.x PDF snapshot strategy:
+//   1. Primary path: clone the live SVG, inline every relevant
+//      computed style onto the clone, serialize, render via Image
+//      on a fresh canvas. Robust against html2canvas' SVG <defs>
+//      / marker rendering quirks, which were the historical cause
+//      of the graph being omitted from the PDF.
+//   2. Fallback path: html2canvas on the full panel. Rarely needed
+//      (primary path covers the subgraph), kept for defense in
+//      depth if SVG serialization fails for any reason.
+const svgEl = graphEl.querySelector("svg");
+if (svgEl) {
+try { return await svgToPngDataUrl(svgEl); }
+catch (err) {
+if (typeof debugLog === "function") debugLog("PDF SVG-PATH FAIL:", err && err.message ? err.message : String(err));
+}
+}
 const canvas = await html2canvas(graphEl, {
 backgroundColor: "#ffffff",
 scale: 2,
 logging: false
 });
 if (canvas && canvas.width > 0 && canvas.height > 0) {
-try { return canvas.toDataURL("image/png"); } catch (e) {}
+return canvas.toDataURL("image/png");
 }
-const svgEl = graphEl.querySelector("svg");
-if (!svgEl) throw new Error("No svg inside graph panel");
-const svgStr = new XMLSerializer().serializeToString(svgEl);
-const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-const url = URL.createObjectURL(svgBlob);
-try {
+throw new Error("All snapshot paths failed (svg + html2canvas)");
+}
+
+async function svgToPngDataUrl(svgEl) {
+const rect = svgEl.getBoundingClientRect();
+const width = Math.max(1, Math.round(rect.width));
+const height = Math.max(1, Math.round(rect.height));
+if (width < 2 || height < 2) throw new Error("SVG has zero dimensions");
+
+// Deep clone so style mutation does not touch the live DOM.
+const clone = svgEl.cloneNode(true);
+clone.setAttribute("width", String(width));
+clone.setAttribute("height", String(height));
+clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+// Visual properties we want frozen into inline style on the clone so
+// the serialized SVG renders the same way when loaded as an <img>
+// (stylesheet rules from the host page are NOT available in that
+// isolated document).
+const props = [
+"fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity",
+"stroke-dasharray", "stroke-linecap", "stroke-linejoin",
+"opacity", "visibility", "display",
+"font-family", "font-size", "font-weight", "font-style",
+"text-anchor", "dominant-baseline", "letter-spacing",
+"stop-color", "stop-opacity",
+"marker-start", "marker-mid", "marker-end"
+];
+
+function inlineComputed(liveNode, cloneNode) {
+const cs = window.getComputedStyle(liveNode);
+let style = "";
+for (let j = 0; j < props.length; j = j + 1) {
+const v = cs.getPropertyValue(props[j]);
+if (v && v !== "normal" && v !== "auto") style = style + props[j] + ":" + v + ";";
+}
+if (style) cloneNode.setAttribute("style", style);
+}
+
+inlineComputed(svgEl, clone);
+const liveNodes = svgEl.querySelectorAll("*");
+const cloneNodes = clone.querySelectorAll("*");
+const n = Math.min(liveNodes.length, cloneNodes.length);
+for (let i = 0; i < n; i = i + 1) inlineComputed(liveNodes[i], cloneNodes[i]);
+
+const serialized = new XMLSerializer().serializeToString(clone);
+// Use a data URL (not a Blob URL): avoids Safari/WebKit edge cases where
+// blob-url images stay tainted or fail to load inside html2pdf's render.
+const svgDataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(serialized);
+
 const img = new Image();
-img.src = url;
+img.decoding = "async";
+img.src = svgDataUrl;
 await new Promise(function(resolve, reject) {
 img.onload = resolve;
 img.onerror = function() { reject(new Error("SVG image load failed")); };
 });
-const w = (svgEl.clientWidth || 720) * 2;
-const h = (svgEl.clientHeight || 360) * 2;
-const c = document.createElement("canvas");
-c.width = w; c.height = h;
-const ctx = c.getContext("2d");
+
+const scale = 2;
+const canvas = document.createElement("canvas");
+canvas.width = width * scale;
+canvas.height = height * scale;
+const ctx = canvas.getContext("2d");
 ctx.fillStyle = "#ffffff";
-ctx.fillRect(0, 0, w, h);
-ctx.drawImage(img, 0, 0, w, h);
-return c.toDataURL("image/png");
-} finally {
-URL.revokeObjectURL(url);
-}
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+return canvas.toDataURL("image/png");
 }
 
 // ============ MESSAGE / INTEL ============
