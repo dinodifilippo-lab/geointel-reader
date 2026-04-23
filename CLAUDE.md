@@ -311,7 +311,7 @@ versioni correnti, feature attive e bug aperti.
 
 ### 9.1 Versioni
 
-- **Frontend**: `app.js` v2.3.4, `index.html` v2.3.4.
+- **Frontend**: `app.js` v2.3.5, `index.html` v2.3.5.
 - **Dataset**: `data.js` v2.0.0 (KG 77 entities + 77 relations, brief_text
   per 6 dossier: russia-ukraine, iran-hormuz, iran-usa, taiwan-strait,
   ai-us-china, red-sea-houthi).
@@ -351,6 +351,18 @@ versioni correnti, feature attive e bug aperti.
     nel summary del pannello debug. Serializza `DEBUG_LOG` in TSV e usa
     `navigator.clipboard.writeText` con fallback `execCommand`. Necessario
     su iPad dove la selezione di testo dentro `<details>` è scomoda.
+11. **NDJSON streaming parser** (v2.3.5): il fetch handler in `app.js`
+    discrimina sul response `Content-Type`. Se `application/x-ndjson`,
+    legge `resp.body` come `ReadableStream`, splitta per `\n`, ignora i
+    frame `start` e `heartbeat`, risolve col `payload` del frame `done`
+    (stesso shape della response buffered, `handleResponse` non vede
+    differenza). Altrimenti path legacy: `resp.text()` + `JSON.parse`.
+    Fallback non-streaming via `resp.text()` + iterazione righe per
+    ambienti senza `getReader`. Frame `type` sconosciuti loggati e
+    ignorati (forward-compatible). Helper: `readNdjsonDone`,
+    `parseNdjsonLine`, `parseNdjsonText` (app.js:854-929). Il frontend
+    è quindi pronto a consumare una Edge Function streaming senza
+    rompere il path attuale.
 
 ### 9.3 Bug aperto — Generator timeout (edge-proxy TTFB)
 
@@ -392,17 +404,31 @@ failed` dopo il suo timeout interno. Il `reason: "EarlyDrop"` a 9 ms
 è coerente: misura solo la CPU di boot prima che la connessione
 venga recisa; il lavoro effettivo (l'await su Anthropic) non conta.
 
-**Fix prevista (non ancora implementata)**: convertire la chiamata
-Anthropic dentro l'Edge Function in **streaming** (`stream: true` lato
-SDK) e restituire al client un `ReadableStream` (SSE o chunked).
-Così gli header HTTP partono al primo token, il proxy non droppa, e
-il frontend può rifare il parsing dello streaming JSON man mano che
-arriva. Workaround temporaneo brittle: abbassare
-`MAX_TOKENS_GENERATOR` sotto la soglia che fa stare la call in <30 s
-(es. 2000 token).
+**Fix prevista (lato frontend: FATTA in v2.3.5; lato Edge Function:
+ancora da fare)**: convertire la chiamata Anthropic dentro l'Edge
+Function in **streaming** (`stream: true` lato SDK) e restituire al
+client un corpo `application/x-ndjson` con frame `start` / `heartbeat`
+/ `done`. Così gli header HTTP partono al primo token, il proxy non
+droppa, e gli heartbeat periodici tengono viva la connessione mentre
+Sonnet lavora. Il frontend v2.3.5 già parsifica questo formato: quando
+la Edge Function streaming va live, il path NDJSON si attiva da solo
+via Content-Type, zero altre modifiche lato client. Workaround
+temporaneo brittle (se si vuole guadagnare tempo prima del refactor
+Edge): abbassare `MAX_TOKENS_GENERATOR` sotto la soglia che fa stare
+la call in <30 s (es. 2000 token).
+
+**Diagnosi ancora non verificata**: la TTFB theory (Sonnet >30 s,
+proxy Supabase droppa) è plausibile ma non dimostrata. Serve ancora
+la durata **wall-clock** dell'invocation fallita dai log Supabase
+(non solo il CPU time, che è di 9 ms e non dice nulla sullo sleep in
+`await`). Alternativa prima del lavoro grosso: una Edge Function
+v2.2.1 con soli `console.log` di checkpoint a ingresso/uscita di
+ogni fase (handler start, body parsed, classifier start/done,
+generator start/done, return), per vedere esattamente dove muore.
+Questa v2.2.1 è stata pianificata ma non ancora scritta.
 
 **Diagnostica in place** (commit `c35db82`, `3ca6917`, `1fed845`,
-`06e213b` — tutti su main):
+`06e213b`, `97fe0ac` — tutti sul branch di sviluppo, in PR #10):
 
 - `app.js:847–852` — pre-fetch: `PAYLOAD SIZE BYTES`, `PAYLOAD KEYS`,
   `KG ENTITIES/RELATIONS COUNT`, `HISTORY LENGTH`,
