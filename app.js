@@ -48,6 +48,7 @@ return currentScenarioIndex >= 0 && currentScenarioIndex < scenarioHistory.lengt
 
 // ============ BASEMAP ASSET (async) ============
 let WORLD_LAND = null;
+let BASEMAP_LOADED = false;
 fetch("world-110m.json")
 .then(function(r) { return r.json(); })
 .then(function(data) { WORLD_LAND = data; BASEMAP_LOADED = true; render(); })
@@ -81,6 +82,12 @@ if (getCurrentScenario() || REPORT_LOADING) return { view: "scenario" };
 return { view: "home" };
 }
 
+let ATLAS_VIEW = { level: "world", clusterId: null };
+let INFO_CARD = { open: false, type: null, id: null };
+let GRAPH_HIGHLIGHT = null;
+let ARCHIVE_OPEN = false;
+let GRAPH_OVERLAY_OPEN = false;
+
 window.addEventListener("hashchange", function() {
 if (!getCurrentScenario() && !REPORT_LOADING) ATLAS_VIEW = { level: "world", clusterId: null };
 render();
@@ -95,17 +102,10 @@ if (INFO_CARD.open) { INFO_CARD = { open: false, type: null, id: null }; render(
 if (GRAPH_HIGHLIGHT) { GRAPH_HIGHLIGHT = null; render(); return; }
 });
 
-let ATLAS_VIEW = { level: "world", clusterId: null };
-let INFO_CARD = { open: false, type: null, id: null };
-
 function makeGreeting() {
 return { role: "ai", time: "Now", text: escapeHTMLForChat(WELCOME_MESSAGE) };
 }
 let GLOBAL_CHAT = [makeGreeting()];
-let GRAPH_HIGHLIGHT = null;
-let ARCHIVE_OPEN = false;
-let GRAPH_OVERLAY_OPEN = false;
-let BASEMAP_LOADED = false;
 
 function newChat() {
 saveChatToArchive();
