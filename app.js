@@ -1,6 +1,6 @@
-// GeoIntel Reader - app.js - v2.4.3
+// GeoIntel Reader - app.js - v2.4.4
 
-const APP_VERSION = "2.4.3";
+const APP_VERSION = "2.4.4";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -982,12 +982,31 @@ if (type === "scenario" && data.scenario && typeof data.scenario === "object") {
 const scenarioId = "sc_" + Date.now() + "_" + Math.floor(Math.random() * 1e6).toString(36);
 const question = data.scenario.question
 || (chatHistory.length >= 2 ? chatHistory[chatHistory.length - 2].content : "");
+// Bug 2 (v2.4.4): strip orphan entity_ids (entities not referenced
+// as from or to in any relation_key). Sonnet occasionally lists
+// entities cited in the prose but not wired into the subgraph,
+// which renders as isolated floating nodes. Filter at scenario
+// construction so downstream features (intel panel, evidence,
+// critical edges) see a consistent, non-orphaned entity set.
+const rawIds = Array.isArray(data.scenario.entity_ids) ? data.scenario.entity_ids : [];
+const rawKeys = Array.isArray(data.scenario.relation_keys) ? data.scenario.relation_keys : [];
+const referenced = new Set();
+rawKeys.forEach(function(k) {
+const parts = String(k).split("|");
+if (parts[0]) referenced.add(parts[0]);
+if (parts[1]) referenced.add(parts[1]);
+});
+const cleanIds = rawIds.filter(function(id) { return referenced.has(id); });
+const orphans = rawIds.filter(function(id) { return !referenced.has(id); });
+if (orphans.length && typeof debugLog === "function") {
+debugLog("SCENARIO ORPHANS REMOVED", orphans.join(","));
+}
 const scenarioObj = {
 id: scenarioId,
 title: data.scenario.title || "Scenario",
 question: question,
 report_html: data.scenario.report_html || "",
-entity_ids: Array.isArray(data.scenario.entity_ids) ? data.scenario.entity_ids.slice() : [],
+entity_ids: cleanIds.slice(),
 relation_keys: Array.isArray(data.scenario.relation_keys) ? data.scenario.relation_keys.slice() : [],
 critical_edges: Array.isArray(data.scenario.critical_edges) ? data.scenario.critical_edges.slice() : [],
 created_at: new Date().toISOString()
@@ -1174,9 +1193,15 @@ return nodes;
 function sgPolaritySign(pol) {
 if (typeof pol === "number") return pol < 0 ? -1 : (pol > 0 ? 1 : 0);
 if (!pol) return 0;
-const s = String(pol).toLowerCase();
-if (s.indexOf("pos") === 0) return 1;
-if (s.indexOf("neg") === 0) return -1;
+const s = String(pol).toLowerCase().trim();
+// Bug 1 (v2.4.4): distinguish direct bilateral antagonism ("neg")
+// from indirect alignment against a third party ("neg-West",
+// "neg-China", "neg-Iran", "neg-indirect", "neg-cost", "neg-for-revenue").
+// "pos" and any "pos-*" variant = cooperation / alignment -> green (+1).
+if (s === "pos" || s.indexOf("pos-") === 0) return 1;
+// Exactly "neg" (no suffix) = direct bilateral antagonism -> red (-1).
+if (s === "neg") return -1;
+// "neg-*", "variable", "systemic", "commercial", anything else -> gray (0).
 return 0;
 }
 
