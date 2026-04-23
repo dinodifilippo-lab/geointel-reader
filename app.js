@@ -1516,22 +1516,30 @@ top_arcs: topArcs
 
 // ============ PDF EXPORT ============
 async function exportScenarioPdf() {
+const log = function(label, value) { if (typeof debugLog === "function") debugLog(label, value); };
+log("PDF START", "exportScenarioPdf()");
 const scenario = getCurrentScenario();
-if (!scenario) { window.print(); return; }
+if (!scenario) { log("PDF SKIP", "no scenario"); window.print(); return; }
 if (typeof html2pdf !== "function" || typeof html2canvas !== "function") {
+log("PDF FALLBACK", "html2pdf/html2canvas not loaded, using window.print()");
 console.warn("html2pdf not loaded; falling back to print");
 window.print();
 return;
 }
 const reportEl = document.querySelector(".scenario-report") || document.querySelector(".report-scroll");
 const graphEl = document.querySelector(".graph-panel");
-if (!reportEl || !graphEl) { window.print(); return; }
+if (!reportEl || !graphEl) {
+log("PDF FALLBACK", "report/graph element missing, using window.print()");
+window.print();
+return;
+}
 let graphPng = null;
 try {
 graphPng = await snapshotGraphAsPng(graphEl);
+log("PDF SNAPSHOT OK", "length=" + (graphPng ? graphPng.length : 0));
 } catch (err) {
 console.warn("Graph snapshot failed:", err);
-if (typeof debugLog === "function") debugLog("PDF GRAPH SNAPSHOT FAIL:", err && err.message ? err.message : String(err));
+log("PDF GRAPH SNAPSHOT FAIL", err && err.message ? err.message : String(err));
 }
 const reportBody = reportEl.outerHTML;
 const snapshotBlock = graphPng
@@ -1548,13 +1556,41 @@ wrapper.innerHTML =
 '<div class="pdf-section">' + reportBody + '</div>' +
 (snapshotBlock ? '<div class="pdf-page-break"></div>' + snapshotBlock : '');
 const filename = "geointel-scenario-" + scenario.id + ".pdf";
-html2pdf().from(wrapper).set({
+const pdfOpts = {
 margin: [10, 10, 10, 10],
 filename: filename,
 pagebreak: { mode: ["css", "legacy"] },
 html2canvas: { scale: 2, backgroundColor: "#ffffff" },
 jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-}).save();
+};
+// iPad Safari often swallows the <a download> click that html2pdf.save()
+// uses. Detect touch-capable Safari and open the PDF in a new tab via
+// blob URL instead: iOS can then render and save it via the share sheet.
+const isIOSLike = /iP(ad|hone|od)/.test(navigator.platform)
+|| (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+|| /iP(ad|hone|od)/.test(navigator.userAgent);
+try {
+if (isIOSLike) {
+log("PDF MODE", "iOS blob-open");
+const pdfBlob = await html2pdf().from(wrapper).set(pdfOpts).outputPdf("blob");
+const blobUrl = URL.createObjectURL(pdfBlob);
+const win = window.open(blobUrl, "_blank");
+if (!win) {
+log("PDF WARN", "popup blocked, falling back to save()");
+await html2pdf().from(wrapper).set(pdfOpts).save();
+}
+// Defer revoke so the new tab has time to load.
+setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 60000);
+log("PDF DONE", filename);
+} else {
+log("PDF MODE", "desktop save()");
+await html2pdf().from(wrapper).set(pdfOpts).save();
+log("PDF DONE", filename);
+}
+} catch (err) {
+log("PDF EXPORT FAIL", err && err.message ? err.message : String(err));
+console.error("PDF export failed:", err);
+}
 }
 
 async function snapshotGraphAsPng(graphEl) {
