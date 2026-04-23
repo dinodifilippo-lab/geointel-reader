@@ -311,14 +311,15 @@ versioni correnti, feature attive e bug aperti.
 
 ### 9.1 Versioni
 
-- **Frontend**: `app.js` v2.3.5, `index.html` v2.3.5.
+- **Frontend**: `app.js` v2.3.6, `index.html` v2.3.6.
 - **Dataset**: `data.js` v2.0.0 (KG 77 entities + 77 relations, brief_text
   per 6 dossier: russia-ukraine, iran-hormuz, iran-usa, taiwan-strait,
   ai-us-china, red-sea-houthi).
-- **Edge Function** `geointel-reader-chat`: v2.2 (two-phase
-  classifier+generator, non-streaming). Modelli:
-  `claude-haiku-4-5-20251001` (classifier, max_tokens 800),
-  `claude-sonnet-4-5-20250929` (generator, max_tokens 5000).
+- **Edge Function** `geointel-reader-chat`: v2.3 (two-phase
+  classifier+generator, **streaming NDJSON**, `[TRACE]` checkpoint
+  logs). Modelli: `claude-haiku-4-5-20251001` (classifier,
+  max_tokens 800), `claude-sonnet-4-5-20250929` (generator,
+  max_tokens 5000).
 
 ### 9.2 Feature attive lato frontend
 
@@ -360,91 +361,100 @@ versioni correnti, feature attive e bug aperti.
     Fallback non-streaming via `resp.text()` + iterazione righe per
     ambienti senza `getReader`. Frame `type` sconosciuti loggati e
     ignorati (forward-compatible). Helper: `readNdjsonDone`,
-    `parseNdjsonLine`, `parseNdjsonText` (app.js:854-929). Il frontend
-    è quindi pronto a consumare una Edge Function streaming senza
-    rompere il path attuale.
+    `parseNdjsonLine`, `parseNdjsonText` (app.js:854-929).
+12. **Full d3@7 bundle** (v2.3.6): `index.html:549` carica
+    `d3@7/dist/d3.min.js` invece di `d3-force@3/dist/d3-force.min.js`.
+    Il bundle standalone di d3-force richiede `d3.timer`,
+    `d3.dispatch`, `d3.quadtree` sul namespace globale; senza di loro
+    `forceSimulation()` crasha con `TypeError: r.timer is not a
+    function`. Il bundle full d3 li include tutti. +~250 KB al primo
+    load, poi cached.
 
-### 9.3 Bug aperto — Generator timeout (edge-proxy TTFB)
+### 9.3 Bug risolto — Generator timeout + d3-force deps (23 apr 2026)
 
-**Sintomo**: dall'UI `vercel.app`, il flusso scenario si interrompe
-**solo sulla seconda chiamata** (conferma "Procedi" → generator). La
-prima chiamata (classifier) va regolarmente a buon fine. Il lato
-Supabase registra `reason: "EarlyDrop"` con ~9 ms di CPU usata; il
-frontend mostra `TypeError: Load failed` dopo esattamente **30 s**.
+Due bug distinti, uno mascherava l'altro. Risolti entrambi. Record
+qui per riferimento futuro.
 
-**Fatti accertati** (dal pannello debug on-screen, v2.3.3, ses. 22 apr
-17:03 UTC):
+**Sintomo originale**: dall'UI `vercel.app`, il flusso scenario si
+interrompeva sulla seconda chiamata (conferma "Procedi" → generator).
+Supabase registrava `reason: "EarlyDrop"` con ~9 ms CPU; Safari
+mostrava `TypeError: Load failed` dopo esattamente **30 s**. Il
+classifier (prima chiamata) funzionava sempre.
 
-| | Turn 1 (classifier) | Turn 2 (generator) |
-|---|---|---|
-| PAYLOAD SIZE | 26.810 B | 27.195 B |
-| HISTORY LENGTH | 0 | 2 |
-| KG ENTITIES / RELATIONS | 77 / 77 | 77 / 77 |
-| RESPONSE STATUS | **200 in ~5 s** | nessuna (fetch muore a 30 s) |
-| FETCH FAILED | — | `TypeError: Load failed` |
+**Bug #1 — TTFB timeout lato proxy Supabase**. Sonnet 4.5 con
+`max_tokens 5000` impiega ~50 s a generare il report. Il proxy
+Supabase (Cloudflare-based) droppa la connessione quando l'Edge
+Function non manda response headers entro ~30 s. `reason: "EarlyDrop"`
+con 9 ms CPU: la CPU misura solo il boot — l'await su Anthropic non
+conta. Confermato da log `[TRACE]` dell'Edge Function streaming:
+start frame emesso a +2 s, generator fetch done a +52 s, done frame
+a +52 s. Senza streaming la connessione moriva a +30 s.
 
-Altri fatti:
+**Fix #1 (Edge Function v2.2 → v2.3, deployata su Supabase)**:
 
-- Test panel Supabase, KG minimo (5 + 3): ✅ 200, ~5–10 s.
-- Test panel Supabase, KG vuoto: ✅ 200, ~5 s.
-- Credito Anthropic OK (~36 USD). Sonnet 4.5 non rate-limited.
-- `Max duration` dell'Edge Function non esposto nel dashboard Supabase
-  Settings (solo Name + Verify JWT + Invoke function).
+- Chiamata Anthropic in `stream: true`.
+- Response body `Content-Type: application/x-ndjson`.
+- Frame `start` emesso al boot del generator → headers partono
+  subito → proxy non droppa.
+- Frame `heartbeat` ogni ~15 s → connessione viva mentre Sonnet
+  lavora.
+- Frame `done` alla fine con `payload` identico alla response
+  legacy buffered (zero modifiche al contract).
+- `[TRACE]` checkpoint logs a ogni fase del handler, leggibili dal
+  dashboard Supabase Functions → Logs.
+- Il source vive solo su Supabase, **non nel repo**.
 
-**Diagnosi corrente** (aggiornata dopo i log di v2.3.3):
+**Fix #1 (lato frontend, v2.3.5, commit `97fe0ac`)**: parser NDJSON
+con discriminazione sul `Content-Type` (vedi §9.2 feature #11).
+Path legacy intatto per retrocompatibilità.
 
-Il bug **non è payload size** — il classifier spedisce lo stesso KG
-(77 + 77) e torna in 5 s. La vera differenza è chi risponde lato Edge
-Function: Haiku (classifier, max_tokens 800) è veloce; Sonnet
-(generator, max_tokens 5000) impiega ben più di 30 s a produrre la
-risposta completa. Il **proxy Supabase (Cloudflare-based) droppa la
-connessione quando l'Edge Function non manda response headers entro
-~30 s**. Safari, non ricevendo header, muore con `TypeError: Load
-failed` dopo il suo timeout interno. Il `reason: "EarlyDrop"` a 9 ms
-è coerente: misura solo la CPU di boot prima che la connessione
-venga recisa; il lavoro effettivo (l'await su Anthropic) non conta.
+**Bug #2 — d3-force dependency mancante**. Il bundle
+`d3-force@3/dist/d3-force.min.js` è UMD e richiede `d3.timer`,
+`d3.dispatch`, `d3.quadtree` pre-caricati sul namespace globale `d3`.
+In `index.html` caricavamo **solo** `d3-force`, quindi `d3.timer` era
+`undefined`. Primo `forceSimulation()` in `computeForceLayout`
+(app.js:1191) → `TypeError: r.timer is not a function` dentro
+d3-force.min.js. Bug dormiente dall'introduzione della force layout
+(v2.2): non si manifestava perché lo scenario non arrivava mai
+(bloccato da bug #1). Risolto il bug #1, bug #2 emerge.
 
-**Fix prevista (lato frontend: FATTA in v2.3.5; lato Edge Function:
-ancora da fare)**: convertire la chiamata Anthropic dentro l'Edge
-Function in **streaming** (`stream: true` lato SDK) e restituire al
-client un corpo `application/x-ndjson` con frame `start` / `heartbeat`
-/ `done`. Così gli header HTTP partono al primo token, il proxy non
-droppa, e gli heartbeat periodici tengono viva la connessione mentre
-Sonnet lavora. Il frontend v2.3.5 già parsifica questo formato: quando
-la Edge Function streaming va live, il path NDJSON si attiva da solo
-via Content-Type, zero altre modifiche lato client. Workaround
-temporaneo brittle (se si vuole guadagnare tempo prima del refactor
-Edge): abbassare `MAX_TOKENS_GENERATOR` sotto la soglia che fa stare
-la call in <30 s (es. 2000 token).
+**Fix #2 (v2.3.6, commit `d307801`)**: `index.html:549` carica
+`d3@7/dist/d3.min.js` invece di `d3-force.min.js`. Il bundle full d3
+include tutti i submodule necessari.
 
-**Diagnosi ancora non verificata**: la TTFB theory (Sonnet >30 s,
-proxy Supabase droppa) è plausibile ma non dimostrata. Serve ancora
-la durata **wall-clock** dell'invocation fallita dai log Supabase
-(non solo il CPU time, che è di 9 ms e non dice nulla sullo sleep in
-`await`). Alternativa prima del lavoro grosso: una Edge Function
-v2.2.1 con soli `console.log` di checkpoint a ingresso/uscita di
-ogni fase (handler start, body parsed, classifier start/done,
-generator start/done, return), per vedere esattamente dove muore.
-Questa v2.2.1 è stata pianificata ma non ancora scritta.
+**Diagnostica lasciata in place** (non rimuovere: utile per il
+prossimo bug di rete):
 
-**Diagnostica in place** (commit `c35db82`, `3ca6917`, `1fed845`,
-`06e213b`, `97fe0ac` — tutti sul branch di sviluppo, in PR #10):
-
-- `app.js:847–852` — pre-fetch: `PAYLOAD SIZE BYTES`, `PAYLOAD KEYS`,
+- `app.js:889–895` — pre-fetch: `PAYLOAD SIZE BYTES`, `PAYLOAD KEYS`,
   `KG ENTITIES/RELATIONS COUNT`, `HISTORY LENGTH`,
   `CURRENT_SCENARIO PRESENT`.
-- `app.js:876–878` — post-fetch: `RESPONSE STATUS`, `RESPONSE OK`,
+- `app.js:918–921` — post-fetch: `RESPONSE STATUS`, `RESPONSE OK`,
   `RESPONSE HEADERS`.
-- `app.js:907–909` — catch: `FETCH FAILED name/message/stack`.
-- Pannello debug on-screen (v2.3.2) con bottone `copy` (v2.3.4) per
-  esportare in TSV e incollare altrove, leggibile da iPad senza
-  DevTools.
+- `app.js:949–952` — catch: `FETCH FAILED name/message/stack`.
+- Pannello debug on-screen (v2.3.2) con bottone `copy` (v2.3.4).
+- Helper NDJSON con logging di frame `UNKNOWN` o `PARSE ERROR`
+  (app.js:854-929).
 
-**Prossimo step**: rifattorizzare l'Edge Function `geointel-reader-chat`
-v2.2 → v2.3 introducendo streaming; adattare la `.then(resp => ...)`
-in `app.js` a leggere il `ReadableStream` invece di `resp.text()`.
-L'Edge Function source **vive solo in Supabase**, non nel repo — va
-editata dal dashboard Functions.
+**Pattern di debug che ha funzionato** (lezione per il futuro):
+
+1. **On-screen debug log su iPad**. Web Inspector è off di default
+   su iPadOS, quindi un ring buffer di log visibile in UI + copy
+   button TSV è indispensabile per triage remoto.
+2. **`[TRACE]` checkpoint logs lato Edge Function**. Ci hanno dato
+   la prova wall-clock (Sonnet gira 50 s) che ha demolito la prima
+   ipotesi sbagliata (payload too large).
+3. **Falsificare ipotesi prima di implementare fix grossi**. La
+   prima diagnosi ("payload too large") era plausibile ma falsa:
+   il classifier spediva lo stesso KG e tornava in 5 s. Il dato che
+   l'ha smentita è arrivato dal browser log confrontando turn 1 vs
+   turn 2.
+4. **Stack trace > error name**. Il `.catch` del fetch accoglie
+   anche eccezioni dal `.then(handleResponse)`, quindi un
+   "FETCH FAILED" loggato può nascondere un errore di rendering
+   (bug #2 si è rivelato leggendo lo stack, non il messaggio).
+5. **Un fix può scoperchiare altri bug dormienti**. Riservare
+   tempo per un altro giro di test end-to-end dopo ogni fix
+   significativo.
 
 ### 9.4 Workflow iPad — memo
 
