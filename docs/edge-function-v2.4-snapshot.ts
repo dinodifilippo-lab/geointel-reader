@@ -16,12 +16,13 @@
 //   - `entity_ids` and `relation_keys` shape unchanged.
 //
 // Rounds:
-//   Round 1 (done): skeleton. All function bodies are stubs.
-//   Round 2 (this commit): CLASSIFIER_SYSTEM_PROMPT + callAnthropicBuffered
-//     + classifier logic in the handler. parseJsonLoose and
-//     buildClassifierInput intentionally left as stubs per instruction
-//     ("Altri stub invariati"), so the code is still non-deployable
-//     end-to-end; the classifier surface is populated structurally.
+//   Round 1 (done): skeleton.
+//   Round 2 (done): CLASSIFIER_SYSTEM_PROMPT + callAnthropicBuffered
+//     + classifier logic in the handler.
+//   Round 2.5 (this commit): parseJsonLoose + buildClassifierInput.
+//     Classifier path now live and testable end-to-end: non-acknowledge
+//     types return a buffered JSON response. The acknowledge path still
+//     returns 501 (generator streaming pending).
 //   Round 3: generator streaming call + generator prompt (critical_edges).
 //   Round 4: NDJSON plumbing (start / heartbeat / done) + handler glue.
 
@@ -191,18 +192,60 @@ async function callAnthropicStreaming(
 // -----------------------------------------------------------------
 // JSON parsing with fallbacks (shared with v2.3)
 // -----------------------------------------------------------------
-// TODO Round 2: try strict parse, then strip markdown fences, then
-// extract first { to last }.
-function parseJsonLoose(_text: string): any | null {
+// Three-stage JSON parse tolerant of chatty model output:
+//   1. Strict JSON.parse.
+//   2. Strip surrounding markdown code fences (```json ... ``` or ``` ... ```).
+//   3. Extract the first '{' to the last '}' and parse the slice.
+// Returns null if all three stages fail; caller decides how to surface.
+function parseJsonLoose(text: string): any | null {
+  if (!text || typeof text !== "string") return null;
+  try { return JSON.parse(text); } catch { /* fall through */ }
+  const fenced = text.match(/^\s*```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+  if (fenced && fenced[1]) {
+    try { return JSON.parse(fenced[1]); } catch { /* fall through */ }
+  }
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first >= 0 && last > first) {
+    try { return JSON.parse(text.slice(first, last + 1)); } catch { /* fall through */ }
+  }
   return null;
 }
 
 // -----------------------------------------------------------------
 // Input builders
 // -----------------------------------------------------------------
-// TODO Round 2: light entity index + flattened history for classifier.
-function buildClassifierInput(_req: any): any[] {
-  return [];
+// Classifier input: a single user-role message whose content is an
+// instruction plus a compact JSON serialisation of the context. The
+// entity index is light (id, label, type, dossiers) to keep the
+// classifier fast; the full KG is only sent to the generator.
+function buildClassifierInput(req: any): any[] {
+  const entityIndex = (req.kg?.entities ?? []).map((e: any) => ({
+    id: e.id,
+    label: e.label,
+    type: e.type,
+    dossiers: e.dossiers,
+  }));
+
+  const history = Array.isArray(req.history) ? req.history.slice(-MAX_HISTORY_TURNS) : [];
+  const historyText = history
+    .map((t: any) => "[" + t.role + "] " + t.content)
+    .join("\n\n");
+
+  const ctx = {
+    user_message: req.question,
+    chat_history: historyText || "(empty - first turn)",
+    dossiers_covered: req.dossier_index ?? [],
+    entity_index: entityIndex,
+    current_scenario: req.current_scenario ?? null,
+  };
+
+  return [
+    {
+      role: "user",
+      content: "Classify the following user interaction and respond with strict JSON as instructed.\n\n" + JSON.stringify(ctx, null, 2),
+    },
+  ];
 }
 
 // TODO Round 3: full KG + preselected entity ids + history + prior
