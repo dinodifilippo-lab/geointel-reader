@@ -1,10 +1,36 @@
-// GeoIntel Reader · app.js · v2.2.0
+// GeoIntel Reader · app.js · v2.3.3
 
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.3";
 console.log("GeoIntel Reader " + APP_VERSION);
 
+// ============ ON-SCREEN DEBUG LOG ============
+// Needed for diagnostics on iPad where Web Inspector is off. Every
+// diagnostic call below mirrors to this ring buffer; the chat panel
+// renders it inside a <details> that auto-opens when CHAT_ERROR fires.
+const DEBUG_LOG_CAP = 40;
+let DEBUG_LOG = [];
+function debugLog(label, data) {
+  try { console.log(label, data); } catch (e) {}
+  let text;
+  try {
+    if (data === undefined) text = "";
+    else if (typeof data === "string") text = data;
+    else if (typeof data === "number" || typeof data === "boolean") text = String(data);
+    else text = JSON.stringify(data);
+  } catch (e) { text = "[unserialisable: " + (e && e.message) + "]"; }
+  if (text && text.length > 300) text = text.slice(0, 300) + "…";
+  const d = new Date();
+  const ts = String(d.getHours()).padStart(2, "0") + ":" +
+             String(d.getMinutes()).padStart(2, "0") + ":" +
+             String(d.getSeconds()).padStart(2, "0");
+  DEBUG_LOG.push({ ts: ts, label: label, text: text });
+  if (DEBUG_LOG.length > DEBUG_LOG_CAP) DEBUG_LOG.shift();
+}
+
 // ============ LIVE CHAT BACKEND ============
-// Supabase Edge Function: geointel-reader-chat (contract v2.1, typed responses).
+// Supabase Edge Function: geointel-reader-chat (contract v2.2, typed responses
+// with scenario.user_question and a pre-rendered question blockquote inside
+// scenario.report_html; evidence_strength is computed client-side).
 const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat";
 
 // TODO(user): paste your Supabase anon key here before deploying.
@@ -152,8 +178,12 @@ function render() {
   renderTopbar(route);
   root.innerHTML = renderWorkingSurfaceHTML();
   wireWorkingSurface(route.view === "scenario");
-  // After the graph SVG is in the DOM, apply the subgraph dim/highlight.
-  if (route.view === "scenario") applyScenarioHighlight();
+  // After the graph SVG is in the DOM, apply the subgraph filter and inject
+  // the client-computed Evidence strength into the Report headline.
+  if (route.view === "scenario") {
+    applyScenarioHighlight();
+    injectEvidenceStrength();
+  }
 }
 
 // ============ TOPBAR ============
@@ -235,6 +265,7 @@ function renderChatPanel() {
             '<button type="button" class="chat-error-dismiss" id="chat-error-dismiss" aria-label="Dismiss">×</button>' +
           '</div>'
         : '') +
+      renderDebugPanel() +
       (CHAT_IN_FLIGHT
         ? '<div class="chat-loading" id="chat-loading" aria-live="polite">Analysing<span class="dots"></span></div>'
         : '') +
@@ -246,6 +277,23 @@ function renderChatPanel() {
       '</div>' +
     '</form>' +
   '</aside>';
+}
+
+function renderDebugPanel() {
+  if (!DEBUG_LOG.length) return '';
+  // Auto-open when an error is visible; user can close/reopen with the caret.
+  const openAttr = CHAT_ERROR ? ' open' : '';
+  const rows = DEBUG_LOG.map(function(e) {
+    return '<div class="debug-row">' +
+      '<span class="debug-ts">' + escapeHTML(e.ts) + '</span>' +
+      '<span class="debug-label">' + escapeHTML(e.label) + '</span>' +
+      '<span class="debug-text">' + escapeHTML(e.text) + '</span>' +
+    '</div>';
+  }).join("");
+  return '<details class="debug-panel"' + openAttr + '>' +
+    '<summary>Debug log · ' + DEBUG_LOG.length + ' entries <button type="button" class="debug-clear" id="debug-clear">clear</button></summary>' +
+    '<div class="debug-body">' + rows + '</div>' +
+  '</details>';
 }
 
 function formatToday() {
@@ -517,6 +565,14 @@ function wireCommonChrome() {
     REPORT_LOADING = false;
     render();
   });
+  // Debug-log clear button inside the chat panel.
+  const dbgClear = document.getElementById("debug-clear");
+  if (dbgClear) dbgClear.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    DEBUG_LOG = [];
+    render();
+  });
   // Graph fullscreen expand + close + overlay dismiss.
   const expandBtn = document.getElementById("graph-expand-btn");
   if (expandBtn) expandBtn.addEventListener("click", function() { GRAPH_OVERLAY_OPEN = true; render(); });
@@ -769,7 +825,6 @@ function handleChatSubmit(text) {
 
   CHAT_IN_FLIGHT = true;
   CHAT_ERROR = null;
-  render();
 
   // v2.2 Section 2.4: `current_scenario` is the REDUCED form of the currently
   // rendered scenario, or null. The LLM uses it for follow-up continuity.
@@ -785,27 +840,87 @@ function handleChatSubmit(text) {
     current_scenario: _csReduced
   };
 
+  // v2.3.1: payload diagnostics (also mirrored to the on-screen debug log).
+  // These must run BEFORE render() so the on-screen panel shows the entries
+  // for the in-flight request; otherwise a hanging fetch leaves the panel
+  // stale at the previous turn's count.
+  debugLog("PAYLOAD SIZE BYTES:", new Blob([JSON.stringify(payload)]).size);
+  debugLog("PAYLOAD KEYS:", Object.keys(payload));
+  debugLog("KG ENTITIES COUNT:", payload.kg && payload.kg.entities && payload.kg.entities.length);
+  debugLog("KG RELATIONS COUNT:", payload.kg && payload.kg.relations && payload.kg.relations.length);
+  debugLog("HISTORY LENGTH:", payload.history && payload.history.length);
+  debugLog("CURRENT_SCENARIO PRESENT:", !!payload.current_scenario);
+
+  // Render AFTER debugLog so the user sees the pre-fetch diagnostics even
+  // if the server never responds.
+  render();
+
+  // Client-side timeout. If the Edge Function hangs (e.g. a slow LLM call
+  // that the runtime then EarlyDrops), we want a clear error instead of
+  // an infinite loader. Matches the max wall-clock budget we assume on
+  // the function side; bump together if the backend limit is raised.
+  const CHAT_TIMEOUT_MS = 180000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(function() { controller.abort(); }, CHAT_TIMEOUT_MS);
+
   fetch(GEOINTEL_CHAT_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": "Bearer " + SUPABASE_ANON_KEY
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal: controller.signal
   }).then(function(resp) {
+    // v2.3.1: response diagnostics (also mirrored on-screen).
+    debugLog("RESPONSE STATUS:", resp.status);
+    debugLog("RESPONSE OK:", resp.ok);
+    debugLog("RESPONSE HEADERS:", [...resp.headers.entries()]);
     if (!resp.ok) {
       return resp.text().then(function(errText) {
-        throw new Error("HTTP " + resp.status + ": " + errText.slice(0, 200));
+        throw new Error("HTTP " + resp.status + ": " + (errText ? errText.slice(0, 300) : resp.statusText || "no body"));
       });
     }
-    return resp.json();
+    // Read as text first so we can surface non-JSON bodies (EarlyDrop can
+    // truncate the response mid-stream).
+    return resp.text().then(function(txt) {
+      try { return JSON.parse(txt); }
+      catch (e) {
+        throw new Error("Malformed JSON from engine (likely EarlyDrop). First 200 chars: " + (txt || "").slice(0, 200));
+      }
+    });
   }).then(function(data) {
+    clearTimeout(timeoutId);
+    // Defensive logging so an unexpected type is visible in DevTools
+    // instead of silently leaving the UI stuck.
+    if (!data || typeof data !== "object") {
+      console.warn("Engine returned non-object payload:", data);
+    } else if (data.error) {
+      throw new Error("Engine error: " + String(data.error).slice(0, 300));
+    } else if (!data.type) {
+      console.warn("Engine returned no `type`; payload was:", data);
+    }
     handleResponse(data || {});
   }).catch(function(err) {
+    clearTimeout(timeoutId);
+    // v2.3.1: verbose failure diagnostics (also mirrored on-screen).
+    debugLog("FETCH FAILED name:", err && err.name);
+    debugLog("FETCH FAILED message:", err && err.message);
+    debugLog("FETCH FAILED stack:", err && err.stack);
     console.error("Chat error:", err);
     CHAT_IN_FLIGHT = false;
     REPORT_LOADING = false;
-    CHAT_ERROR = "Unable to reach the analysis engine. Please try again.";
+    // Make the cause visible in the UI, not only in DevTools. Timeout and
+    // EarlyDrop look different, so the user / operator can triage.
+    const isAbort = err && (err.name === "AbortError" || /abort/i.test(String(err.message || "")));
+    if (isAbort) {
+      CHAT_ERROR = "Request timed out after " + Math.round(CHAT_TIMEOUT_MS / 1000) +
+        "s. The Edge Function likely hit its wall-clock limit (EarlyDrop). " +
+        "Raise `wallClockLimitMs` on the function and retry.";
+    } else {
+      const detail = (err && err.message) ? String(err.message).slice(0, 260) : "unknown error";
+      CHAT_ERROR = "Analysis engine error: " + detail;
+    }
     // Roll back the API history since the turn did not land.
     if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") {
       chatHistory.pop();
@@ -934,15 +1049,63 @@ function computeKgLayout() {
   return positions;
 }
 
+// v2.3 Section 5: force-directed layout for the active subgraph. Falls back
+// to cluster layout if d3-force is not available (e.g. CDN blocked).
+function computeForceLayout(entities, relations, width, height) {
+  if (typeof d3 === "undefined" || typeof d3.forceSimulation !== "function") return null;
+  // d3-force mutates node/link objects in place.
+  const nodes = entities.map(function(e) { return { id: e.id, entity: e }; });
+  const nodeById = {};
+  nodes.forEach(function(n) { nodeById[n.id] = n; });
+  const links = relations
+    .filter(function(r) { return nodeById[r.from] && nodeById[r.to]; })
+    .map(function(r) { return { source: r.from, target: r.to, rel: r }; });
+  const sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(function(d) { return d.id; }).distance(110).strength(0.6))
+    .force("charge", d3.forceManyBody().strength(-380))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collision", d3.forceCollide().radius(34))
+    .stop();
+  for (let i = 0; i < 300; i++) sim.tick();
+  // Clamp to viewport with a margin so labels don't clip.
+  const margin = 32;
+  const positions = {};
+  nodes.forEach(function(n) {
+    positions[n.id] = {
+      cx: +Math.max(margin, Math.min(width - margin, n.x)).toFixed(1),
+      cy: +Math.max(margin, Math.min(height - margin, n.y)).toFixed(1),
+      entity: n.entity
+    };
+  });
+  return positions;
+}
+
 function renderKgGraphSVG(fullscreen) {
   const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
-  const pos = computeKgLayout();
+  const vbW = fullscreen ? 960 : KG_VIEWBOX_W;
+  const vbH = fullscreen ? 540 : KG_VIEWBOX_H;
+  const clusterPos = computeKgLayout();
+  // When a scenario is active, compute a fresh force-directed layout over
+  // just the highlighted subset; non-highlighted nodes stay at their cluster
+  // coords but are hidden via CSS (display:none).
+  const cs = getCurrentScenario();
+  let subgraphPos = null;
+  if (cs && cs.entity_ids && cs.entity_ids.length) {
+    const idSet = new Set(cs.entity_ids);
+    const keySet = new Set(cs.relation_keys || []);
+    const subEntities = kg.entities.filter(function(e) { return idSet.has(e.id); });
+    const subRelations = kg.relations.filter(function(r) { return keySet.has(r.from + "|" + r.to + "|" + r.type); });
+    subgraphPos = computeForceLayout(subEntities, subRelations, vbW, vbH);
+  }
+  function posFor(id) {
+    if (subgraphPos && subgraphPos[id]) return subgraphPos[id];
+    return clusterPos[id];
+  }
   const arcs = kg.relations.map(function(r) {
-    const a = pos[r.from], b = pos[r.to];
+    const a = posFor(r.from), b = posFor(r.to);
     if (!a || !b) return "";
     const key = r.from + "|" + r.to + "|" + r.type;
     const stroke = arcStroke(r.polarity);
-    // Curve slightly so parallel arcs don't overlap.
     const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2;
     const dx = b.cx - a.cx, dy = b.cy - a.cy;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -957,22 +1120,22 @@ function renderKgGraphSVG(fullscreen) {
       ' d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"' +
       ' stroke-opacity="0.85" stroke-linecap="round"/>';
   }).join("");
-  const nodes = Object.keys(pos).map(function(id) {
-    const p = pos[id];
+  // v2.3 Section 3: EVERY node gets a label. Labels are children of the <g>
+  // so display:none on the group hides them too (no orphan labels).
+  const nodes = Object.keys(clusterPos).map(function(id) {
+    const p = posFor(id);
+    if (!p) return "";
     const e = p.entity;
     const fill = e.type === "asset" ? "#a8570f" : "#0d7a6e";
     const r = e.type === "asset" ? 7 : 8;
-    const showLabel = fullscreen || (e.type === "actor");
+    const labelText = e.short_name || e.label || e.id;
     const labelY = (p.cy + r + 10).toFixed(1);
-    const label = showLabel
-      ? '<text class="kg-label" x="' + p.cx.toFixed(1) + '" y="' + labelY + '" text-anchor="middle">' + escapeHTML(e.label) + '</text>'
-      : "";
     return '<g class="kg-node" data-node-id="' + escapeHTML(id) + '" data-type="' + e.type + '">' +
       '<circle cx="' + p.cx.toFixed(1) + '" cy="' + p.cy.toFixed(1) + '" r="' + r + '" fill="' + fill + '" stroke="#ffffff" stroke-width="1.5"/>' +
-      label +
+      '<text class="kg-label" x="' + p.cx.toFixed(1) + '" y="' + labelY + '" text-anchor="middle">' + escapeHTML(labelText) + '</text>' +
     '</g>';
   }).join("");
-  return '<svg class="graph-svg kg-graph" viewBox="0 0 ' + KG_VIEWBOX_W + ' ' + KG_VIEWBOX_H + '" preserveAspectRatio="xMidYMid meet">' +
+  return '<svg class="graph-svg kg-graph" viewBox="0 0 ' + vbW + ' ' + vbH + '" preserveAspectRatio="xMidYMid meet">' +
     '<g class="kg-arcs">' + arcs + '</g>' +
     '<g class="kg-nodes">' + nodes + '</g>' +
   '</svg>';
@@ -988,15 +1151,17 @@ function arcStroke(polarity) {
 }
 
 function applyScenarioHighlight() {
+  const cs = getCurrentScenario();
+  const ids = cs ? new Set(cs.entity_ids || []) : null;
+  const keys = cs ? new Set(cs.relation_keys || []) : null;
+  // In-page graph panel(s).
   document.querySelectorAll(".graph-panel").forEach(function(panel) {
     panel.classList.remove("active-subgraph");
     panel.querySelectorAll(".kg-node.highlighted, .kg-arc.highlighted").forEach(function(el) {
       el.classList.remove("highlighted");
     });
-    if (!getCurrentScenario()) return;
+    if (!cs) return;
     panel.classList.add("active-subgraph");
-    const ids = new Set(getCurrentScenario().entity_ids || []);
-    const keys = new Set(getCurrentScenario().relation_keys || []);
     panel.querySelectorAll(".kg-node").forEach(function(n) {
       if (ids.has(n.getAttribute("data-node-id"))) n.classList.add("highlighted");
     });
@@ -1004,28 +1169,86 @@ function applyScenarioHighlight() {
       if (keys.has(a.getAttribute("data-relation-key"))) a.classList.add("highlighted");
     });
   });
-  // Mirror the highlight in the fullscreen overlay (if open).
-  document.querySelectorAll(".graph-overlay .kg-graph").forEach(function(svg) {
-    svg.parentElement.classList.add("active-subgraph");
-    if (!getCurrentScenario()) return;
-    const ids = new Set(getCurrentScenario().entity_ids || []);
-    const keys = new Set(getCurrentScenario().relation_keys || []);
-    svg.querySelectorAll(".kg-node").forEach(function(n) {
+  // Mirror the highlight in the fullscreen overlay (if open). The CSS rule
+  // uses `.graph-overlay-canvas.active-subgraph` so we flag the canvas.
+  document.querySelectorAll(".graph-overlay-canvas").forEach(function(canvas) {
+    canvas.classList.remove("active-subgraph");
+    if (!cs) return;
+    canvas.classList.add("active-subgraph");
+    canvas.querySelectorAll(".kg-node").forEach(function(n) {
       n.classList.toggle("highlighted", ids.has(n.getAttribute("data-node-id")));
     });
-    svg.querySelectorAll(".kg-arc").forEach(function(a) {
+    canvas.querySelectorAll(".kg-arc").forEach(function(a) {
       a.classList.toggle("highlighted", keys.has(a.getAttribute("data-relation-key")));
     });
   });
 }
 
-// Derive a minimal Intel panel payload from the active scenario.
+// v2.3 Section 1: evidence strength = mean(confidence) of the relations in
+// the scenario's relation_keys, rounded to 2 decimals. null if empty.
+function computeEvidenceStrength() {
+  const cs = getCurrentScenario();
+  if (!cs || !cs.relation_keys || cs.relation_keys.length === 0) return null;
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { relations: [] };
+  const relByKey = {};
+  kg.relations.forEach(function(r) { relByKey[r.from + "|" + r.to + "|" + r.type] = r; });
+  const confs = cs.relation_keys
+    .map(function(k) { return relByKey[k]; })
+    .filter(function(r) { return r && typeof r.confidence === "number"; })
+    .map(function(r) { return r.confidence; });
+  if (!confs.length) return null;
+  const mean = confs.reduce(function(a, b) { return a + b; }, 0) / confs.length;
+  return Math.round(mean * 100) / 100;
+}
+
+function evidenceStrengthLabel(value) {
+  if (value == null) return "—";
+  if (value < 0.55) return "weak";
+  if (value < 0.70) return "moderate";
+  if (value < 0.80) return "moderate-high";
+  return "high";
+}
+
+// Count of scenario arcs that actually matched a KG relation with confidence.
+function evidenceStrengthCount() {
+  const cs = getCurrentScenario();
+  if (!cs || !cs.relation_keys) return 0;
+  const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { relations: [] };
+  const relByKey = {};
+  kg.relations.forEach(function(r) { relByKey[r.from + "|" + r.to + "|" + r.type] = r; });
+  return cs.relation_keys.filter(function(k) {
+    const r = relByKey[k];
+    return r && typeof r.confidence === "number";
+  }).length;
+}
+
+// v2.3 Section 1: after the report_html lands in the DOM, append an
+// Evidence-strength .headline-item to the .scenario-headline emitted by
+// the backend. Idempotent: marked with .evidence-strength to dedupe.
+function injectEvidenceStrength() {
+  const panel = document.querySelector(".scenario-report .scenario-headline");
+  if (!panel) return;
+  if (panel.querySelector(".headline-item.evidence-strength")) return;
+  const value = computeEvidenceStrength();
+  if (value == null) return;
+  const label = evidenceStrengthLabel(value);
+  const item = document.createElement("div");
+  item.className = "headline-item evidence-strength";
+  item.innerHTML =
+    '<span class="headline-label">Evidence strength</span>' +
+    '<span class="headline-value">' + value.toFixed(2) +
+      ' <span class="headline-range">' + escapeHTML(label) + '</span>' +
+    '</span>';
+  panel.appendChild(item);
+}
+
+// Derive the Intel panel payload from the active scenario (v2.3 Section 2:
+// Evidence strength replaces Confidence; same number as the Report).
 function computeScenarioIntel() {
   if (!getCurrentScenario()) {
     return {
-      confidence: { value: 0.0, label: "No scenario", note: "Ask a question to populate." },
-      top_arcs: [],
-      events: []
+      evidence: { value: null, label: "—", note: "Generate a scenario to see evidence strength." },
+      top_arcs: []
     };
   }
   const kg = (window.CHESS_DATA && window.CHESS_DATA.kg) || { entities: [], relations: [] };
@@ -1034,14 +1257,11 @@ function computeScenarioIntel() {
   const picked = (getCurrentScenario().relation_keys || [])
     .map(function(k) { return relByKey[k]; })
     .filter(Boolean);
-  const avgConf = picked.length
-    ? picked.reduce(function(s, r) { return s + (r.confidence || 0); }, 0) / picked.length
-    : 0;
-  const label = avgConf >= 0.8 ? "High confidence"
-    : avgConf >= 0.65 ? "Moderate-high confidence"
-    : avgConf > 0 ? "Moderate confidence" : "—";
-  const note = picked.length
-    ? "Averaged over " + picked.length + " arc(s) in the highlighted subgraph."
+  const value = computeEvidenceStrength();
+  const label = evidenceStrengthLabel(value);
+  const note = value != null
+    ? label.charAt(0).toUpperCase() + label.slice(1) + " — mean confidence across " +
+      evidenceStrengthCount() + " arc" + (evidenceStrengthCount() === 1 ? "" : "s") + " in this scenario."
     : "No arcs matched in the current scenario.";
   const idLabel = {};
   kg.entities.forEach(function(e) { idLabel[e.id] = e.label; });
@@ -1060,9 +1280,8 @@ function computeScenarioIntel() {
       };
     });
   return {
-    confidence: { value: avgConf, label: label, note: note },
-    top_arcs: topArcs,
-    events: []
+    evidence: { value: value, label: label, note: note },
+    top_arcs: topArcs
   };
 }
 
@@ -1189,9 +1408,16 @@ function recallScenario(id) {
 }
 
 function renderIntel(intel) {
-  const C = intel.confidence;
+  // v2.3 Section 2: Evidence strength replaces Confidence. Same number as
+  // the Report headline (both use computeEvidenceStrength()).
+  const E = intel.evidence;
+  const hasValue = typeof E.value === "number";
   const circumference = 2 * Math.PI * 23;
-  const offset = circumference * (1 - C.value);
+  const offset = hasValue ? circumference * (1 - E.value) : circumference;
+  const bigLabel = hasValue ? "Evidence strength" : "Evidence strength";
+  const smallLabel = hasValue
+    ? E.label.charAt(0).toUpperCase() + E.label.slice(1)
+    : "";
 
   const arcsHTML = intel.top_arcs.map(function(a) {
     const polaritySign = a.polarity === "neg" ? "−" : "+";
@@ -1206,16 +1432,18 @@ function renderIntel(intel) {
   }).join("");
 
   return '<div class="intel-section">' +
-    '<div class="intel-header"><span class="intel-sec-title">Confidence</span></div>' +
+    '<div class="intel-header"><span class="intel-sec-title">Evidence strength</span></div>' +
     '<div class="confidence-block">' +
       '<div class="gauge">' +
         '<svg width="58" height="58" viewBox="0 0 58 58">' +
           '<circle cx="29" cy="29" r="23" fill="none" stroke="#ebe8df" stroke-width="5"/>' +
-          '<circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>' +
+          (hasValue
+            ? '<circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>'
+            : '') +
         '</svg>' +
-        '<div class="gauge-text">' + C.value.toFixed(2) + '</div>' +
+        '<div class="gauge-text">' + (hasValue ? E.value.toFixed(2) : "—") + '</div>' +
       '</div>' +
-      '<div class="confidence-meta"><div class="big">' + C.label + '</div><div class="small">' + C.note + '</div></div>' +
+      '<div class="confidence-meta"><div class="big">' + (hasValue ? smallLabel : bigLabel) + '</div><div class="small">' + escapeHTML(E.note || "") + '</div></div>' +
     '</div>' +
   '</div>' +
   (arcsHTML
