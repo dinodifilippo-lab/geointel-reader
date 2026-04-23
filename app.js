@@ -1,6 +1,6 @@
-// GeoIntel Reader · app.js · v2.3.4
+// GeoIntel Reader · app.js · v2.3.5
 
-const APP_VERSION = "2.3.4";
+const APP_VERSION = "2.3.5";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -851,6 +851,84 @@ function buildDossierIndex() {
   });
 }
 
+// v2.3.5: NDJSON streaming reader.
+// Consumes the response body as a UTF-8 text stream, splits per newline,
+// parses each line as a frame, ignores "start" and "heartbeat", and
+// resolves with the payload of the "done" frame. That payload has the
+// same shape as the legacy buffered JSON body, so handleResponse does
+// not need to know whether the transport was buffered or streamed.
+function readNdjsonDone(resp) {
+  if (!resp.body || typeof resp.body.getReader !== "function") {
+    // Environments without streaming (older Safari, some proxies):
+    // buffer the whole text and iterate lines as a fallback.
+    return resp.text().then(parseNdjsonText);
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let framesSeen = 0;
+
+  function pump() {
+    return reader.read().then(function(chunk) {
+      if (chunk.done) {
+        const tail = buffer.trim();
+        if (tail) {
+          const frame = parseNdjsonLine(tail);
+          if (frame) {
+            framesSeen = framesSeen + 1;
+            if (frame.type === "done") return frame.payload || {};
+          }
+        }
+        throw new Error("NDJSON stream ended without a 'done' frame (frames seen: " + framesSeen + ")");
+      }
+      buffer = buffer + decoder.decode(chunk.value, { stream: true });
+      let nl = buffer.indexOf("\n");
+      while (nl !== -1) {
+        const raw = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        nl = buffer.indexOf("\n");
+        if (!raw) continue;
+        const frame = parseNdjsonLine(raw);
+        if (!frame) continue;
+        framesSeen = framesSeen + 1;
+        if (frame.type === "start" || frame.type === "heartbeat") continue;
+        if (frame.type === "done") {
+          try { reader.cancel(); } catch (e) { /* ignore */ }
+          return frame.payload || {};
+        }
+        // Forward-compatible: unknown frames get logged but do not break the stream.
+        debugLog("NDJSON UNKNOWN FRAME:", frame.type);
+      }
+      return pump();
+    });
+  }
+
+  return pump();
+}
+
+function parseNdjsonLine(line) {
+  try { return JSON.parse(line); }
+  catch (e) {
+    debugLog("NDJSON PARSE ERROR:", (line || "").slice(0, 120));
+    return null;
+  }
+}
+
+function parseNdjsonText(txt) {
+  const lines = String(txt || "").split("\n");
+  let framesSeen = 0;
+  for (let i = 0; i < lines.length; i = i + 1) {
+    const raw = lines[i].trim();
+    if (!raw) continue;
+    const frame = parseNdjsonLine(raw);
+    if (!frame) continue;
+    framesSeen = framesSeen + 1;
+    if (frame.type === "start" || frame.type === "heartbeat") continue;
+    if (frame.type === "done") return frame.payload || {};
+  }
+  throw new Error("NDJSON body had no 'done' frame (frames seen: " + framesSeen + ")");
+}
+
 function handleChatSubmit(text) {
   const now = formatNow();
 
@@ -924,8 +1002,16 @@ function handleChatSubmit(text) {
         throw new Error("HTTP " + resp.status + ": " + (errText ? errText.slice(0, 300) : resp.statusText || "no body"));
       });
     }
-    // Read as text first so we can surface non-JSON bodies (EarlyDrop can
-    // truncate the response mid-stream).
+    // v2.3.5: branch on Content-Type.
+    // If the Edge Function streams NDJSON, read the ReadableStream frame by
+    // frame and resolve with the "done" payload (same shape as buffered).
+    // Otherwise fall back to the legacy buffered JSON body.
+    const contentType = (resp.headers.get("content-type") || "").toLowerCase();
+    if (contentType.indexOf("application/x-ndjson") !== -1) {
+      return readNdjsonDone(resp);
+    }
+    // Legacy path: whole body is a single JSON object. Read as text first so
+    // non-JSON bodies (e.g. EarlyDrop truncation) surface a clear error.
     return resp.text().then(function(txt) {
       try { return JSON.parse(txt); }
       catch (e) {
