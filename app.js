@@ -1,6 +1,6 @@
-// GeoIntel Reader · app.js · v2.3.5
+// GeoIntel Reader · app.js · v2.3.6
 
-const APP_VERSION = "2.3.5";
+const APP_VERSION = "2.3.6";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
