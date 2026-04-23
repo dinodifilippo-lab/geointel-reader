@@ -1,6 +1,6 @@
-// GeoIntel Reader - app.js - v2.4.1
+// GeoIntel Reader - app.js - v2.4.2
 
-const APP_VERSION = "2.4.1";
+const APP_VERSION = "2.4.2";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -607,7 +607,12 @@ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); recallScenario(id)
 });
 });
 document.querySelectorAll(".download-btn").forEach(function(btn) {
-btn.addEventListener("click", function() { exportScenarioPdf(); });
+btn.addEventListener("click", function(e) {
+e.preventDefault();
+if (typeof debugLog === "function") debugLog("PDF CLICK", "received");
+try { render(); } catch (_) {}
+exportScenarioPdf();
+});
 });
 wireArchiveDrawer();
 }
@@ -1516,7 +1521,15 @@ top_arcs: topArcs
 
 // ============ PDF EXPORT ============
 async function exportScenarioPdf() {
-const log = function(label, value) { if (typeof debugLog === "function") debugLog(label, value); };
+// Log helper that also triggers a render so the on-screen debug
+// panel actually refreshes between steps. Without this, debugLog
+// pushes entries to DEBUG_LOG but the panel stays stale until some
+// other code path calls render() - which for the PDF flow never
+// happens, so the user sees nothing on iPad.
+const log = function(label, value) {
+if (typeof debugLog === "function") debugLog(label, value);
+try { render(); } catch (_) {}
+};
 log("PDF START", "exportScenarioPdf()");
 const scenario = getCurrentScenario();
 if (!scenario) { log("PDF SKIP", "no scenario"); window.print(); return; }
