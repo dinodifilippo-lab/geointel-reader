@@ -188,6 +188,7 @@ return '<div class="graph-overlay" role="dialog" aria-label="Graph fullscreen">'
 '<button class="graph-overlay-close" id="graph-overlay-close" type="button" aria-label="Close">x</button>' +
 '</div>' +
 '<div class="graph-overlay-canvas" id="graph-overlay-canvas"></div>' +
+renderSubgraphLegend(true) +
 '<div class="graph-overlay-hint">Esc to close</div>' +
 '</div>' +
 '</div>';

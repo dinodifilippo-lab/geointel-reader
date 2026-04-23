@@ -352,6 +352,27 @@ html, body {
 .graph-ctrl.active { background: var(--teal-bg); color: var(--teal); border-color: var(--teal); }
 .graph-svg-wrap { flex: 1 1 auto; min-height: 0; position: relative; background: #ffffff; overflow: hidden; }
 .graph-svg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; display: block; }
+/* v2.4 subgraph legend (inline under graph-panel and inside fullscreen overlay). */
+.subgraph-legend-bar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 10px 16px; border-top: 1px solid #efece4; background: #ffffff; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); }
+.subgraph-legend-bar.compact { padding: 8px 12px; gap: 10px; font-size: 10.5px; }
+.sg-leg-sec { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
+.sg-leg-sec + .sg-leg-sec { border-left: 1px solid #d9d4c6; padding-left: 14px; }
+.sg-leg-sec strong { color: var(--text-1); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; font-size: 10px; }
+.sg-leg-item { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); white-space: nowrap; }
+.sg-leg-item svg { flex: 0 0 auto; }
+.sg-leg-item.sg-muted { color: var(--text-4); font-style: italic; }
+.sg-vol-pill { display: inline-block; min-width: 16px; padding: 1px 5px; margin-right: 4px; text-align: center; border-radius: 3px; font-weight: 700; font-size: 10px; color: #ffffff; font-family: 'JetBrains Mono', monospace; }
+.sg-vol-h { background: #dc2626; }
+.sg-vol-m { background: #d97706; }
+.sg-vol-l { background: #059669; }
+.subgraph-glossary { flex: 0 0 auto; padding: 0 16px 10px; background: #ffffff; border-top: 1px dashed #efece4; }
+.subgraph-glossary summary { cursor: pointer; padding: 8px 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; letter-spacing: 0.08em; font-size: 10px; color: var(--text-3); text-transform: uppercase; list-style: none; }
+.subgraph-glossary summary::-webkit-details-marker { display: none; }
+.subgraph-glossary summary::before { content: "\25B8  "; color: var(--text-4); }
+.subgraph-glossary[open] summary::before { content: "\25BE  "; }
+.sg-glos-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 14px; padding-bottom: 8px; }
+.sg-glos-item { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+.sg-glos-item strong { display: inline-block; color: var(--text-1); margin-right: 6px; }
 .legend { flex: 0 0 auto; display: flex; gap: 14px; padding: 8px 16px 10px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 10px; border-top: 1px solid #efece4; background: #ffffff; }
 .legend-item { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-weight: 600; }
 .intel-panel { flex: 0 0 320px; min-height: 0; display: flex; flex-direction: column; background: #ffffff; overflow: hidden; }
