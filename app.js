@@ -1,6 +1,6 @@
-// GeoIntel Reader - app.js - v2.4.2
+// GeoIntel Reader - app.js - v2.4.3
 
-const APP_VERSION = "2.4.2";
+const APP_VERSION = "2.4.3";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -1534,7 +1534,8 @@ log("PDF START", "exportScenarioPdf()");
 const scenario = getCurrentScenario();
 if (!scenario) { log("PDF SKIP", "no scenario"); window.print(); return; }
 if (typeof html2pdf !== "function" || typeof html2canvas !== "function") {
-log("PDF FALLBACK", "html2pdf/html2canvas not loaded, using window.print()");
+log("PDF LIB MISSING", "html2pdf=" + (typeof html2pdf) + ", html2canvas=" + (typeof html2canvas));
+log("PDF FALLBACK", "using window.print()");
 console.warn("html2pdf not loaded; falling back to print");
 window.print();
 return;
