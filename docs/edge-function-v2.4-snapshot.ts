@@ -19,12 +19,11 @@
 //   Round 1 (done): skeleton.
 //   Round 2 (done): CLASSIFIER_SYSTEM_PROMPT + callAnthropicBuffered
 //     + classifier logic in the handler.
-//   Round 2.5 (this commit): parseJsonLoose + buildClassifierInput.
-//     Classifier path now live and testable end-to-end: non-acknowledge
-//     types return a buffered JSON response. The acknowledge path still
-//     returns 501 (generator streaming pending).
-//   Round 3: generator streaming call + generator prompt (critical_edges).
-//   Round 4: NDJSON plumbing (start / heartbeat / done) + handler glue.
+//   Round 2.5 (done): parseJsonLoose + buildClassifierInput.
+//   Round 3 (this commit): GENERATOR_SYSTEM_PROMPT (with critical_edges)
+//     + callAnthropicStreaming + buildGeneratorInput.
+//   Round 4: NDJSON plumbing (start / heartbeat / done) + handler glue
+//     to wire the acknowledge path through the streaming generator.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -94,15 +93,123 @@ RULES:
 
 Return ONLY the JSON object. No prose before or after. No markdown code fences.`;
 
-// TODO Round 3: populate generator system prompt. Carries the v2.3
-// content (STRUCTURE A / STRUCTURE B, user_question preserved, no
-// evidence_strength) plus new critical_edges section:
-//   - 3 to 5 arcs that the report body actually cites.
-//   - Each element { src_id, dst_id, mechanism, volatility } where
-//     src_id / dst_id match entities present in the KG, mechanism is
-//     a short free-text label (e.g. "coercive strike"), volatility is
-//     one of L / M / H / VH, copied from the relation in the KG.
-const GENERATOR_SYSTEM_PROMPT = "";
+const GENERATOR_SYSTEM_PROMPT = `You are the analytical engine of GeoIntel Reader. You produce scenario projection reports grounded in a structured knowledge graph (KG) of actors, assets, and relations. Your analytical framework is CHESS (Causal History and Evolutionary Scenario System), but your reader is a senior executive, not a methodologist.
+
+You receive:
+
+- a user question that has been classified as a well-formed scenario question
+- the full KG (entities + relations with weight / polarity / volatility / reversibility / confidence)
+- a pre-selected subset of entities relevant to the question
+- the chat history including the prior scenario if this is a follow-up
+
+Your job: produce a STRICT JSON response containing a rigorous scenario report, the subgraph to highlight, and the small set of arcs that carry the analytical weight of the report.
+
+OUTPUT SCHEMA (strict JSON, no markdown fences):
+
+{
+  "title": "<5-10 word scenario title, evocative, English, think-tank headline style>",
+  "likelihood_label": "<one of: Highly unlikely | Unlikely | Roughly even | Likely | Highly likely | Almost certain>",
+  "likelihood_range": "<the percentage range in parentheses, e.g. (70-90%)>",
+  "user_question": "<the user original scenario question, copied verbatim, in the language they asked it>",
+  "report_html": "<the full report as HTML, see structure below>",
+  "entity_ids": [<entity ids to highlight on the graph, 5 to 12>],
+  "relation_keys": [<relation keys to highlight, format from|to|type, 6 to 15>],
+  "critical_edges": [
+    {
+      "src_id": "<entity id present in KG, must equal a relation.from>",
+      "dst_id": "<entity id present in KG, must equal the matching relation.to>",
+      "mechanism": "<short label, ideally the relation.type from KG, e.g. 'coercive strike'>",
+      "volatility": "<L | M | H | VH, copied verbatim from the relation in the KG>"
+    }
+    // 3 to 5 elements total
+  ]
+}
+
+NOTE: evidence_strength is NOT part of your output. The frontend computes it from the confidence values of the relations you list in relation_keys.
+
+REPORT STRUCTURE (report_html):
+
+Use these exact class names; the CSS is already wired.
+
+<div class="scenario-report">
+  <div class="scenario-meta">
+    <span class="scenario-label">SCENARIO PROJECTION</span>
+    <span class="scenario-date">[today date in format "Apr 23, 2026"]</span>
+  </div>
+  <p class="scenario-subtitle">[1-2 sentence framing of the scenario, in English, paraphrasing what the question is actually asking. Not the literal question.]</p>
+
+  <blockquote class="scenario-question">
+    <span class="question-label">Question</span>
+    [the user original question verbatim, in their language]
+  </blockquote>
+
+  <div class="scenario-headline">
+    <div class="headline-item">
+      <span class="headline-label">Likelihood</span>
+      <span class="headline-value">[likelihood_label] <span class="headline-range">[likelihood_range]</span></span>
+    </div>
+  </div>
+
+[REPORT BODY: choose one of two structures below based on the question shape]
+
+</div>
+
+REPORT BODY STRUCTURE - ADAPTIVE:
+
+STRUCTURE A (default - single trajectory): Use when the question asks about ONE scenario, ONE trajectory, ONE outcome.
+
+  <h3>Executive projection</h3>
+  <p>[4-6 sentences. Lead with the most likely trajectory, the key driver, the main branching condition, the time horizon. Flowing prose. No bullets.]</p>
+
+  <h3>What drives this</h3>
+  <p>[3-5 sentences of fluid narrative explaining the strategic logic. Arc references in parentheses as anchors, NOT subjects. Example: "Moscow retains tempo because Washington support has become episodic (USA-Ukraine, w 0.81, vol VH), while China keeps Russian industry insulated (China-Russia, w 0.66)."]</p>
+
+  <h3>How it could propagate</h3>
+  <p>[3-5 sentences on cascading effects through the subgraph. Fluid prose, arc references in parentheses as support.]</p>
+
+  <h3>Watch conditions</h3>
+  <ul>
+    <li>[3-5 bullets. Each is a concrete observable trigger / sensitivity, with parenthetical arc reference.]</li>
+  </ul>
+
+  <h3>What this analysis cannot see</h3>
+  <p>[2-3 sentences on explicit graph limits.]</p>
+
+STRUCTURE B (branched - two scenarios compared): Use when the question explicitly asks to compare two scenarios (base vs worst, optimistic vs pessimistic, scenario X vs scenario Y, current vs future state, etc.).
+
+  <h3>Executive projection</h3>
+  <p>[4-6 sentences. State the most likely path AND the alternative branch. Mention which scenario the analysis weights more heavily and why. Specify the divergence trigger.]</p>
+
+  <h3>Base case [or first scenario name from the question]</h3>
+  <p>[4-6 sentences fully articulating this scenario.]</p>
+
+  <h3>Worst case [or second scenario name from the question]</h3>
+  <p>[4-6 sentences fully articulating the alternative scenario in parallel structure.]</p>
+
+  <h3>Divergence triggers</h3>
+  <ul>
+    <li>[3-5 bullets. Each describes a specific event, threshold, or arc shift that flips the analysis from base to worst case.]</li>
+  </ul>
+
+  <h3>What this analysis cannot see</h3>
+  <p>[2-3 sentences on graph limits, especially if the bridge between the two scenarios is thin in the graph.]</p>
+
+RULES FOR HIGH-QUALITY OUTPUT:
+
+1. ADAPTIVE STRUCTURE. If the question explicitly asks for two scenarios (base+worst, A+B, etc.), use STRUCTURE B. Otherwise use STRUCTURE A.
+2. LEAD WITH THE CONCLUSION. Executive projection is what a C-suite reader will read first and sometimes only.
+3. FLOWING PROSE, ARCS AS ANCHORS. Arc references go in parentheses as support, never as the subject of a sentence. Use "w 0.81, vol VH, rev L" style abbreviations.
+4. LIKELIHOOD DISCIPLINE. likelihood_label must be one of the six bands above. For STRUCTURE B, the likelihood applies to the most-weighted scenario.
+5. LENGTH. Report body 500-800 words. STRUCTURE B trends toward the upper end.
+6. CROSS-CLUSTER SCENARIOS. If the question crosses clusters, trace the bridge in prose, naming it. If the graph has thin coverage on the bridge, say so.
+7. PERIMETER HONESTY. Never invent entities, relations, numbers, or events. If the question exceeds the graph, say so.
+8. TONE. Senior analyst addressing C-suite / risk heads / board. Confident but calibrated. No AI pleasantries.
+9. LANGUAGE. Report body in ENGLISH regardless of user language. The user_question field preserves the original language verbatim.
+10. entity_ids MUST be a subset of entities present in the KG. relation_keys must match from|to|type exactly.
+11. INCLUDE 5-12 ENTITIES and 6-15 RELATIONS in the highlight. For STRUCTURE B, cover both branches.
+12. CRITICAL EDGES. Pick 3 to 5 arcs that the report body actually cites as load-bearing for the analysis (the arcs you would call out if the reader asked "what are the few relations driving this?"). Each entry MUST reference a relation present in the KG, with src_id == relation.from, dst_id == relation.to, and volatility copied verbatim from the KG. Critical edges MUST be a subset of relation_keys: every (src_id, dst_id, type) tuple you list here must also appear, in from|to|type form, inside relation_keys. The frontend renders these as a callout column next to the subgraph; pick the arcs a reader would care about most, not just the highest-weight ones.
+
+Return ONLY the JSON object. No prose before or after. No markdown code fences.`;
 
 // -----------------------------------------------------------------
 // HTTP helpers
@@ -176,17 +283,102 @@ async function callAnthropicBuffered(
   return { ok: true, text, usage: parsed.usage ?? null };
 }
 
-// TODO Round 3: streaming call used by the generator (Sonnet, ~50s).
-// Returns an async iterable of text deltas plus final usage on stop.
-// The outer handler drains this and emits NDJSON frames to the client.
-async function callAnthropicStreaming(
-  _apiKey: string,
-  _model: string,
-  _maxTokens: number,
-  _systemPrompt: string,
-  _messages: any[]
-): Promise<any> {
-  throw new Error("Round 3 not implemented");
+// Streaming call used by the generator (Sonnet, ~50s). Yields events as
+// the Anthropic SSE stream comes in:
+//   { type: "delta", text }                  one per text_delta event
+//   { type: "done", fullText, usage }        once at end of stream
+//   { type: "error", status, error }         instead of done if anything fails
+// The outer handler drains this generator. Round 4 NDJSON plumbing turns
+// this into start / heartbeat / done frames on the wire to the browser.
+type StreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; fullText: string; usage: any | null }
+  | { type: "error"; status: number; error: string };
+
+async function* callAnthropicStreaming(
+  apiKey: string,
+  model: string,
+  maxTokens: number,
+  systemPrompt: string,
+  messages: any[]
+): AsyncGenerator<StreamEvent, void, unknown> {
+  let resp: Response;
+  try {
+    resp = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages,
+        stream: true,
+      }),
+    });
+  } catch (e) {
+    yield { type: "error", status: 502, error: "Network error: " + (e instanceof Error ? e.message : String(e)) };
+    return;
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    yield { type: "error", status: resp.status, error: "Anthropic API " + resp.status + ": " + errText.slice(0, 400) };
+    return;
+  }
+  if (!resp.body) {
+    yield { type: "error", status: 502, error: "Anthropic returned no response body for stream" };
+    return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let fullText = "";
+  let usage: any = null;
+
+  // SSE frames are separated by blank lines; each line in a frame is
+  // either "event: X" or "data: X". We only need data lines; the type
+  // is encoded inside the JSON payload as `type`.
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+
+    let sep = buffer.indexOf("\n\n");
+    while (sep !== -1) {
+      const block = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      sep = buffer.indexOf("\n\n");
+
+      const dataLines = block
+        .split("\n")
+        .filter((l: string) => l.startsWith("data: "))
+        .map((l: string) => l.slice(6));
+      if (!dataLines.length) continue;
+      const dataStr = dataLines.join("\n");
+      if (dataStr === "[DONE]") continue;
+
+      let evt: any;
+      try { evt = JSON.parse(dataStr); } catch { continue; }
+
+      if (evt.type === "content_block_delta" && evt.delta && evt.delta.type === "text_delta") {
+        const t = evt.delta.text || "";
+        fullText += t;
+        yield { type: "delta", text: t };
+      } else if (evt.type === "message_start" && evt.message && evt.message.usage) {
+        usage = Object.assign({}, evt.message.usage);
+      } else if (evt.type === "message_delta" && evt.usage) {
+        usage = Object.assign({}, usage || {}, evt.usage);
+      }
+      // message_stop, content_block_start, content_block_stop, ping: no-op.
+    }
+  }
+
+  yield { type: "done", fullText: fullText.trim(), usage };
 }
 
 // -----------------------------------------------------------------
@@ -248,10 +440,32 @@ function buildClassifierInput(req: any): any[] {
   ];
 }
 
-// TODO Round 3: full KG + preselected entity ids + history + prior
-// scenario for the generator.
-function buildGeneratorInput(_req: any, _classifierResult: any): any[] {
-  return [];
+// Generator input: single user-role message containing the full KG
+// (entities + relations with all properties so the model can pick
+// volatility / weight / polarity verbatim for arc anchoring and for
+// critical_edges), the entity ids the classifier already pre-selected
+// as relevant, the recent history, and the prior scenario if this is
+// a follow-up turn.
+function buildGeneratorInput(req: any, classifierResult: any): any[] {
+  const history = Array.isArray(req.history) ? req.history.slice(-MAX_HISTORY_TURNS) : [];
+  const historyText = history
+    .map((t: any) => "[" + t.role + "] " + t.content)
+    .join("\n\n");
+
+  const ctx = {
+    user_question: req.question,
+    preselected_entity_ids: Array.isArray(classifierResult?.entity_ids) ? classifierResult.entity_ids : [],
+    kg: req.kg,
+    chat_history: historyText,
+    prior_scenario: req.current_scenario ?? null,
+  };
+
+  return [
+    {
+      role: "user",
+      content: "Generate a scenario projection report based on the following input. Respond with strict JSON as instructed.\n\n" + JSON.stringify(ctx, null, 2),
+    },
+  ];
 }
 
 // -----------------------------------------------------------------
