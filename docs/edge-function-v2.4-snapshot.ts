@@ -20,10 +20,13 @@
 //   Round 2 (done): CLASSIFIER_SYSTEM_PROMPT + callAnthropicBuffered
 //     + classifier logic in the handler.
 //   Round 2.5 (done): parseJsonLoose + buildClassifierInput.
-//   Round 3 (this commit): GENERATOR_SYSTEM_PROMPT (with critical_edges)
+//   Round 3 (done): GENERATOR_SYSTEM_PROMPT (with critical_edges)
 //     + callAnthropicStreaming + buildGeneratorInput.
-//   Round 4: NDJSON plumbing (start / heartbeat / done) + handler glue
-//     to wire the acknowledge path through the streaming generator.
+//   Round 4 (this commit): buildNdjsonStream + handler glue for the
+//     acknowledge -> streaming generator path. File is now deployable
+//     end-to-end. After Supabase deploy + confirmation, step 4 of the
+//     outer plan will git rm this snapshot to restore the "Edge source
+//     lives only in Supabase" invariant.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -471,14 +474,124 @@ function buildGeneratorInput(req: any, classifierResult: any): any[] {
 // -----------------------------------------------------------------
 // NDJSON stream plumbing
 // -----------------------------------------------------------------
-// TODO Round 4: emit NDJSON frames to the client:
-//   { type: "start" }                         at boot
+// NDJSON stream to the client. Emits:
+//   { type: "start" }                         immediately, to make the proxy
+//                                             release response headers and
+//                                             avoid the 30s TTFB drop.
 //   { type: "heartbeat", t: <ms-since-t0> }   every HEARTBEAT_INTERVAL_MS
-//   { type: "done", payload: <full-body> }    when generator returns
-// `payload` keeps the v2.3 shape: { type, message, scenario?, debug? }
-// with scenario now carrying `critical_edges` in addition to v2.3 fields.
-function buildNdjsonStream(_runGenerator: () => Promise<any>): ReadableStream {
-  return new ReadableStream();
+//                                             while the generator is working.
+//   { type: "done", payload: <body> }         once the generator completes or
+//                                             errors.
+//
+// `payload` keeps the v2.3 buffered shape { type, message, scenario?, debug? }
+// so the frontend's handleResponse does not need to care whether the
+// transport was buffered or streamed. `scenario` in v2.4 carries the new
+// `critical_edges` array in addition to the v2.3 fields. On generator
+// failure, payload degrades to { error: "..." } which the frontend
+// surfaces as a chat error.
+function buildNdjsonStream(
+  t0: number,
+  classifierResult: any,
+  classifierUsage: any,
+  streamEvents: AsyncGenerator<StreamEvent>
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let heartbeatTimer: number | null = null;
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (frame: any) => {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(frame) + "\n"));
+        } catch {
+          // Client disconnected; stream controller will throw on enqueue.
+        }
+      };
+
+      // 1. Start frame goes out immediately: this is what keeps the
+      // Supabase edge proxy from dropping the connection at ~30s TTFB.
+      send({ type: "start" });
+      console.log("[TRACE +" + (Date.now() - t0) + "ms] stream: start frame emitted");
+
+      // 2. Heartbeat ticker: small keepalive frames every 15s while the
+      // generator is still working. Sonnet can take ~50s; without these
+      // the proxy would still drop.
+      heartbeatTimer = setInterval(() => {
+        send({ type: "heartbeat", t: Date.now() - t0 });
+        console.log("[TRACE +" + (Date.now() - t0) + "ms] stream: heartbeat");
+      }, HEARTBEAT_INTERVAL_MS) as unknown as number;
+
+      // 3. Drain the generator's SSE events. Delta events are absorbed
+      // into fullText inside callAnthropicStreaming; we only observe
+      // done / error here, since the frontend contract is "one scenario
+      // payload at the end", not per-token streaming to the client.
+      let donePayload: any = null;
+      try {
+        for await (const evt of streamEvents) {
+          if (evt.type === "done") {
+            console.log("[TRACE +" + (Date.now() - t0) + "ms] generator fetch done, ok=true");
+            const parsed = parseJsonLoose(evt.fullText);
+            if (!parsed || typeof parsed.report_html !== "string"
+                       || !Array.isArray(parsed.entity_ids)
+                       || !Array.isArray(parsed.relation_keys)) {
+              donePayload = {
+                error: "Generator returned malformed JSON",
+                detail: (evt.fullText || "").slice(0, 500),
+              };
+              break;
+            }
+            donePayload = {
+              type: "scenario",
+              message: classifierResult.message,
+              scenario: {
+                title: parsed.title || "Scenario Projection",
+                likelihood_label: parsed.likelihood_label || null,
+                likelihood_range: parsed.likelihood_range || null,
+                user_question: parsed.user_question || null,
+                report_html: parsed.report_html,
+                entity_ids: parsed.entity_ids,
+                relation_keys: parsed.relation_keys,
+                critical_edges: Array.isArray(parsed.critical_edges) ? parsed.critical_edges : [],
+              },
+              debug: {
+                classifier_note: classifierResult.reasoning_note ?? null,
+                classifier_usage: classifierUsage,
+                generator_usage: evt.usage,
+              },
+            };
+            break;
+          }
+          if (evt.type === "error") {
+            console.log("[TRACE +" + (Date.now() - t0) + "ms] generator fetch error, status=" + evt.status);
+            donePayload = { error: "Generator failure (status " + evt.status + "): " + evt.error };
+            break;
+          }
+          // evt.type === "delta": silently absorbed, contributes to fullText.
+        }
+      } catch (e) {
+        donePayload = { error: "Stream iteration failure: " + (e instanceof Error ? e.message : String(e)) };
+      }
+
+      if (heartbeatTimer !== null) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+
+      // 4. Emit the terminal done frame and close the stream.
+      console.log("[TRACE +" + (Date.now() - t0) + "ms] stream: emitting done frame, scenario present=" + (!!(donePayload && donePayload.scenario)));
+      send({ type: "done", payload: donePayload || { error: "Generator emitted no events" } });
+      try { controller.close(); } catch { /* already closed */ }
+      console.log("[TRACE +" + (Date.now() - t0) + "ms] stream closed");
+    },
+
+    cancel() {
+      if (heartbeatTimer !== null) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      console.log("[TRACE +" + (Date.now() - t0) + "ms] stream cancelled by client");
+    },
+  });
 }
 
 // -----------------------------------------------------------------
@@ -551,7 +664,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  // Acknowledge path: stream the generator. TODO Round 3 + 4.
-  console.log("[TRACE +" + (Date.now() - t0) + "ms] acknowledge path, generator not yet wired");
-  return errorResponse("Generator streaming not yet wired (v2.4 Round 3 + 4 pending).", 501);
+  // Acknowledge path: stream the generator through NDJSON. The Response
+  // headers flush as soon as we return; the stream's start() callback
+  // then emits the "start" frame within milliseconds, well under the
+  // 30s TTFB drop threshold of the Supabase edge proxy.
+  console.log("[TRACE +" + (Date.now() - t0) + "ms] entering streaming mode for generator");
+  const generatorMessages = buildGeneratorInput(payload, classified);
+  console.log("[TRACE +" + (Date.now() - t0) + "ms] generator fetch start (within stream)");
+  const streamEvents = callAnthropicStreaming(
+    apiKey,
+    MODEL_GENERATOR,
+    MAX_TOKENS_GENERATOR,
+    GENERATOR_SYSTEM_PROMPT,
+    generatorMessages
+  );
+  const body = buildNdjsonStream(t0, classified, classRes.usage, streamEvents);
+  return new Response(body, {
+    status: 200,
+    headers: Object.assign(
+      {
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-cache, no-transform",
+      },
+      CORS_HEADERS
+    ),
+  });
 });
