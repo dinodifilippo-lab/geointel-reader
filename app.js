@@ -28,7 +28,7 @@ if (DEBUG_LOG.length > DEBUG_LOG_CAP) DEBUG_LOG.shift();
 const GEOINTEL_CHAT_ENDPOINT = "https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNodXZmZGJwd2lzemp1b3lodmx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTU2NzcsImV4cCI6MjA4OTk3MTY3N30.7OAuk36xTNa6cFyF2cnpBRUtgeZpttAyi-ZA28_fhdU";
 
-const WELCOME_MESSAGE = "Ciao. Questa e’ una demo di GeoIntel Reader. Posso costruire proiezioni di scenario su 6 aree: Russia-Ucraina, Iran (Hormuz e rivalita’ con USA), Taiwan, AI US-Cina, Mar Rosso-Houthi.\n\nFai una domanda di scenario. Se mancano elementi per rispondere bene, te li chiedo. Quando lo scenario e’ chiaro, genero report e sotto-grafo.";
+const WELCOME_MESSAGE = "Ciao. Questa e' una demo di GeoIntel Reader. Posso costruire proiezioni di scenario su 6 aree: Russia-Ucraina, Iran (Hormuz e rivalita' con USA), Taiwan, AI US-Cina, Mar Rosso-Houthi.\n\nFai una domanda di scenario. Se mancano elementi per rispondere bene, te li chiedo. Quando lo scenario e' chiaro, genero report e sotto-grafo.";
 
 let CHAT_IN_FLIGHT = false;
 let CHAT_ERROR = null;
@@ -155,107 +155,107 @@ const leftEl = document.getElementById("topbar-left-extra");
 const centerEl = document.getElementById("topbar-center");
 if (!leftEl || !centerEl) return;
 if (route.view === "scenario") {
-leftEl.innerHTML = ‘<a class="back-to-atlas" href="#" id="back-to-atlas">← Atlas</a>’;
+leftEl.innerHTML = '<a class="back-to-atlas" href="#" id="back-to-atlas">← Atlas</a>';
 const title = getCurrentScenario() && getCurrentScenario().title
 ? getCurrentScenario().title
 : (REPORT_LOADING ? "Generating scenario…" : "Scenario");
-centerEl.innerHTML = ’<span class="dossier-pill">SCENARIO · ’ + escapeHTML(title.toUpperCase()) + ‘</span>’;
+centerEl.innerHTML = '<span class="dossier-pill">SCENARIO · ' + escapeHTML(title.toUpperCase()) + '</span>';
 } else {
-leftEl.innerHTML = ‘’;
-centerEl.innerHTML = ‘’;
+leftEl.innerHTML = '';
+centerEl.innerHTML = '';
 }
 }
 
 function renderWorkingSurfaceHTML() {
 const route = getRoute();
-return ‘<div class="working-surface">’ +
-(ARCHIVE_OPEN ? renderArchiveDrawer() : ‘’) +
+return '<div class="working-surface">' +
+(ARCHIVE_OPEN ? renderArchiveDrawer() : '') +
 renderChatPanel() +
-‘<div class="right-area">’ +
+'<div class="right-area">' +
 (route.view === "scenario" ? renderPopulatedRight() : renderAmbientRight()) +
-‘</div>’ +
-(GRAPH_OVERLAY_OPEN && route.view === "scenario" ? renderGraphOverlay() : ‘’) +
-‘</div>’;
+'</div>' +
+(GRAPH_OVERLAY_OPEN && route.view === "scenario" ? renderGraphOverlay() : '') +
+'</div>';
 }
 
 function renderGraphOverlay() {
 const title = getCurrentScenario() && getCurrentScenario().title ? getCurrentScenario().title : "Subgraph";
-return ‘<div class="graph-overlay" role="dialog" aria-label="Graph fullscreen">’ +
-‘<div class="graph-overlay-bg" data-overlay-dismiss="1"></div>’ +
-‘<div class="graph-overlay-box">’ +
-‘<div class="graph-overlay-header">’ +
-’<div class="graph-overlay-title">Subgraph · ’ + escapeHTML(title) + ‘</div>’ +
-‘<button class="graph-overlay-close" id="graph-overlay-close" type="button" aria-label="Close">x</button>’ +
-‘</div>’ +
-‘<div class="graph-overlay-canvas" id="graph-overlay-canvas"></div>’ +
-‘<div class="graph-overlay-hint">Esc to close</div>’ +
-‘</div>’ +
-‘</div>’;
+return '<div class="graph-overlay" role="dialog" aria-label="Graph fullscreen">' +
+'<div class="graph-overlay-bg" data-overlay-dismiss="1"></div>' +
+'<div class="graph-overlay-box">' +
+'<div class="graph-overlay-header">' +
+'<div class="graph-overlay-title">Subgraph · ' + escapeHTML(title) + '</div>' +
+'<button class="graph-overlay-close" id="graph-overlay-close" type="button" aria-label="Close">x</button>' +
+'</div>' +
+'<div class="graph-overlay-canvas" id="graph-overlay-canvas"></div>' +
+'<div class="graph-overlay-hint">Esc to close</div>' +
+'</div>' +
+'</div>';
 }
 
 function renderChatPanel() {
 const count = GLOBAL_CHAT.length;
 const metaLabel = count <= 1 ? "Ready" : count + " msg · Session";
 const isEmpty = count <= 1;
-const messagesHTML = ‘<div class="day-sep">Today · ’ + formatToday() + ‘</div>’ +
+const messagesHTML = '<div class="day-sep">Today · ' + formatToday() + '</div>' +
 GLOBAL_CHAT.map(renderMessage).join("");
-return ‘<aside class="chat-panel">’ +
-‘<div class="panel-header">’ +
-‘<span class="panel-title">Chat</span>’ +
-‘<div class="chat-header-right">’ +
-‘<button class="new-chat-btn" id="archive-btn" title="Open archive">’ +
-‘<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>’ +
-‘</button>’ +
-‘<button class="new-chat-btn" id="new-chat-btn" title="New chat">’ +
-‘<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>’ +
-‘<span>New</span>’ +
-‘</button>’ +
-‘<span class="panel-meta">’ + metaLabel + ‘</span>’ +
-‘</div>’ +
-‘</div>’ +
-‘<div class="chat-messages' + (isEmpty ? ' empty' : '') + '" id="chat-messages">’ +
+return '<aside class="chat-panel">' +
+'<div class="panel-header">' +
+'<span class="panel-title">Chat</span>' +
+'<div class="chat-header-right">' +
+'<button class="new-chat-btn" id="archive-btn" title="Open archive">' +
+'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>' +
+'</button>' +
+'<button class="new-chat-btn" id="new-chat-btn" title="New chat">' +
+'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
+'<span>New</span>' +
+'</button>' +
+'<span class="panel-meta">' + metaLabel + '</span>' +
+'</div>' +
+'</div>' +
+'<div class="chat-messages' + (isEmpty ? ' empty' : '') + '" id="chat-messages">' +
 messagesHTML +
-‘</div>’ +
-‘<form class="chat-input-wrap" id="chat-form">’ +
+'</div>' +
+'<form class="chat-input-wrap" id="chat-form">' +
 (CHAT_ERROR
-? ‘<div class="chat-error" id="chat-error" role="alert">’ +
-‘<span class="chat-error-text">’ + escapeHTML(CHAT_ERROR) + ‘</span>’ +
-‘<button type="button" class="chat-error-dismiss" id="chat-error-dismiss" aria-label="Dismiss">x</button>’ +
-‘</div>’
-: ‘’) +
+? '<div class="chat-error" id="chat-error" role="alert">' +
+'<span class="chat-error-text">' + escapeHTML(CHAT_ERROR) + '</span>' +
+'<button type="button" class="chat-error-dismiss" id="chat-error-dismiss" aria-label="Dismiss">x</button>' +
+'</div>'
+: '') +
 renderDebugPanel() +
 (CHAT_IN_FLIGHT
-? ‘<div class="chat-loading" id="chat-loading" aria-live="polite">Analysing<span class="dots"></span></div>’
-: ‘’) +
-‘<div class="chat-input-box">’ +
-‘<textarea id="chat-textarea" placeholder="Chiedi uno scenario (es. finestra migliore per un'azione cinese su Taiwan)…" rows="1"’ + (CHAT_IN_FLIGHT ? ’ disabled’ : ‘’) + ‘></textarea>’ +
-‘<div class="chat-input-actions">’ +
-‘<button type="submit" class="send-btn" id="chat-send"’ + (CHAT_IN_FLIGHT ? ’ disabled’ : ‘’) + ‘>Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>’ +
-‘</div>’ +
-‘</div>’ +
-‘</form>’ +
-‘</aside>’;
+? '<div class="chat-loading" id="chat-loading" aria-live="polite">Analysing<span class="dots"></span></div>'
+: '') +
+'<div class="chat-input-box">' +
+'<textarea id="chat-textarea" placeholder="Chiedi uno scenario (es. finestra migliore per un\'azione cinese su Taiwan)…" rows="1"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '></textarea>' +
+'<div class="chat-input-actions">' +
+'<button type="submit" class="send-btn" id="chat-send"' + (CHAT_IN_FLIGHT ? ' disabled' : '') + '>Run <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>' +
+'</div>' +
+'</div>' +
+'</form>' +
+'</aside>';
 }
 
 function renderDebugPanel() {
-if (!DEBUG_LOG.length) return ‘’;
-const openAttr = CHAT_ERROR ? ’ open’ : ‘’;
+if (!DEBUG_LOG.length) return '';
+const openAttr = CHAT_ERROR ? ' open' : '';
 const rows = DEBUG_LOG.map(function(e) {
-return ‘<div class="debug-row">’ +
-‘<span class="debug-ts">’ + escapeHTML(e.ts) + ‘</span>’ +
-‘<span class="debug-label">’ + escapeHTML(e.label) + ‘</span>’ +
-‘<span class="debug-text">’ + escapeHTML(e.text) + ‘</span>’ +
-‘</div>’;
+return '<div class="debug-row">' +
+'<span class="debug-ts">' + escapeHTML(e.ts) + '</span>' +
+'<span class="debug-label">' + escapeHTML(e.label) + '</span>' +
+'<span class="debug-text">' + escapeHTML(e.text) + '</span>' +
+'</div>';
 }).join("");
-return ‘<details class="debug-panel"’ + openAttr + ‘>’ +
-’<summary>Debug log · ’ + DEBUG_LOG.length + ’ entries ’ +
-‘<span class="debug-actions">’ +
-‘<button type="button" class="debug-clear" id="debug-copy">copy</button>’ +
-‘<button type="button" class="debug-clear" id="debug-clear">clear</button>’ +
-‘</span>’ +
-‘</summary>’ +
-‘<div class="debug-body">’ + rows + ‘</div>’ +
-‘</details>’;
+return '<details class="debug-panel"' + openAttr + '>' +
+'<summary>Debug log · ' + DEBUG_LOG.length + ' entries ' +
+'<span class="debug-actions">' +
+'<button type="button" class="debug-clear" id="debug-copy">copy</button>' +
+'<button type="button" class="debug-clear" id="debug-clear">clear</button>' +
+'</span>' +
+'</summary>' +
+'<div class="debug-body">' + rows + '</div>' +
+'</details>';
 }
 
 function formatToday() {
@@ -270,32 +270,32 @@ const regionLabel = ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId
 ? (CHESS_DATA.clusters.find(function(x){return x.id === ATLAS_VIEW.clusterId;}) || {}).label || ""
 : "";
 const headerRight = ATLAS_VIEW.level === "region"
-? ‘<button class="ambient-back" id="ambient-back">← World</button>’
-: ‘’;
-return ‘<div class="atlas-ambient">’ +
-‘<div class="ambient-header">’ +
-‘<div class="ambient-head-text">’ +
-‘<div class="ambient-title">Atlas’ + (regionLabel ? ’ <span class="ambient-sub">· ’ + regionLabel + ‘</span>’ : ‘’) + ‘</div>’ +
-‘<div class="ambient-subtitle">’ +
+? '<button class="ambient-back" id="ambient-back">← World</button>'
+: '';
+return '<div class="atlas-ambient">' +
+'<div class="ambient-header">' +
+'<div class="ambient-head-text">' +
+'<div class="ambient-title">Atlas' + (regionLabel ? ' <span class="ambient-sub">· ' + regionLabel + '</span>' : '') + '</div>' +
+'<div class="ambient-subtitle">' +
 (!BASEMAP_LOADED
-? ‘Loading basemap…’
+? 'Loading basemap…'
 : ATLAS_VIEW.level === "region"
-? ‘Tap a dossier to open, or ask directly in chat.’
-: ‘Ask in chat, or tap a region to drill in.’) +
-‘</div>’ +
-‘</div>’ +
+? 'Tap a dossier to open, or ask directly in chat.'
+: 'Ask in chat, or tap a region to drill in.') +
+'</div>' +
+'</div>' +
 headerRight +
-‘</div>’ +
-‘<div class="atlas-ambient-map" id="atlas-ambient-map">’ +
+'</div>' +
+'<div class="atlas-ambient-map" id="atlas-ambient-map">' +
 renderAtlasSVG() +
-(INFO_CARD.open ? renderInfoCard() : ‘’) +
-‘</div>’ +
-‘<div class="ambient-legend">’ +
-‘<div class="legend-group"><span class="legend-dot" style="background:#0d7a6e"></span><span>Active dossier</span></div>’ +
-‘<div class="legend-group"><span class="legend-dot" style="background:#c4bfb1"></span><span>Region in osservazione</span></div>’ +
-‘<div class="legend-group"><span class="legend-dot" style="background:#5b21b6"></span><span>Trans-geografico (orbital)</span></div>’ +
-‘</div>’ +
-‘</div>’;
+(INFO_CARD.open ? renderInfoCard() : '') +
+'</div>' +
+'<div class="ambient-legend">' +
+'<div class="legend-group"><span class="legend-dot" style="background:#0d7a6e"></span><span>Active dossier</span></div>' +
+'<div class="legend-group"><span class="legend-dot" style="background:#c4bfb1"></span><span>Region in osservazione</span></div>' +
+'<div class="legend-group"><span class="legend-dot" style="background:#5b21b6"></span><span>Trans-geografico (orbital)</span></div>' +
+'</div>' +
+'</div>';
 }
 
 function renderAtlasSVG() {
@@ -304,37 +304,37 @@ const labelScale = ATLAS_VIEW.level === "region" ? 0.5 : 1;
 const showOrbital = ATLAS_VIEW.level === "world";
 const regionDossiers = (ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId)
 ? renderRegionDossierMarkers(ATLAS_VIEW.clusterId, labelScale)
-: ‘’;
-return ‘<svg class="atlas-svg interactive" viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet">’ +
-‘<rect class="atlas-bg" x="0" y="0" width="' + MAP_W + '" height="' + MAP_H + '"/>’ +
-‘<ellipse class="atlas-graticule" cx="' + (MAP_W/2) + '" cy="' + (MAP_H/2) + '" rx="' + (MAP_W * 0.46) + '" ry="' + (MAP_H * 0.58) + '"/>’ +
-‘<g class="land">’ + renderLand() + ‘</g>’ +
-‘<g class="clusters">’ + renderClusterMarkers(labelScale) + ‘</g>’ +
-‘<g class="region-dossiers">’ + regionDossiers + ‘</g>’ +
-‘<g class="orbital-ring">’ + (showOrbital ? renderOrbitalMarkers(labelScale) : ‘’) + ‘</g>’ +
-‘</svg>’;
+: '';
+return '<svg class="atlas-svg interactive" viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet">' +
+'<rect class="atlas-bg" x="0" y="0" width="' + MAP_W + '" height="' + MAP_H + '"/>' +
+'<ellipse class="atlas-graticule" cx="' + (MAP_W/2) + '" cy="' + (MAP_H/2) + '" rx="' + (MAP_W * 0.46) + '" ry="' + (MAP_H * 0.58) + '"/>' +
+'<g class="land">' + renderLand() + '</g>' +
+'<g class="clusters">' + renderClusterMarkers(labelScale) + '</g>' +
+'<g class="region-dossiers">' + regionDossiers + '</g>' +
+'<g class="orbital-ring">' + (showOrbital ? renderOrbitalMarkers(labelScale) : '') + '</g>' +
+'</svg>';
 }
 
 function renderInfoCard() {
-if (INFO_CARD.type !== "dossier") return ‘’;
+if (INFO_CARD.type !== "dossier") return '';
 const d = CHESS_DATA.dossiers[INFO_CARD.id];
-if (!d) return ‘’;
+if (!d) return '';
 const actors = (d.actors || []).map(function(a) {
-return ‘<span class="actor-chip">’ + a + ‘</span>’;
+return '<span class="actor-chip">' + a + '</span>';
 }).join("");
 const cluster = d.cluster_id ? CHESS_DATA.clusters.find(function(x){return x.id === d.cluster_id;}) : null;
 const eyebrow = d.trans_geographic ? "Trans-geographic" : (cluster ? cluster.label : "Dossier");
-return ‘<aside class="info-card" role="dialog" aria-label="Dossier information">’ +
-‘<button class="info-card-close" title="Close">x</button>’ +
-‘<div class="info-card-eyebrow">’ + eyebrow + ‘</div>’ +
-‘<h2 class="info-card-title">’ + d.title + ‘</h2>’ +
-‘<p class="info-card-desc">’ + d.description + ‘</p>’ +
-‘<div class="info-card-section-label">Actors</div>’ +
-‘<div class="actor-list">’ + actors + ‘</div>’ +
-‘<div class="info-card-foot">’ +
-‘<span>’ + d.stats.entities + ’ entities · ’ + d.stats.relations + ’ arcs · ’ + d.stats.corpus + ’ articles</span>’ +
-‘</div>’ +
-‘</aside>’;
+return '<aside class="info-card" role="dialog" aria-label="Dossier information">' +
+'<button class="info-card-close" title="Close">x</button>' +
+'<div class="info-card-eyebrow">' + eyebrow + '</div>' +
+'<h2 class="info-card-title">' + d.title + '</h2>' +
+'<p class="info-card-desc">' + d.description + '</p>' +
+'<div class="info-card-section-label">Actors</div>' +
+'<div class="actor-list">' + actors + '</div>' +
+'<div class="info-card-foot">' +
+'<span>' + d.stats.entities + ' entities · ' + d.stats.relations + ' arcs · ' + d.stats.corpus + ' articles</span>' +
+'</div>' +
+'</aside>';
 }
 
 function computeAmbientViewBox() {
@@ -357,79 +357,79 @@ const reportBody = REPORT_LOADING
 ? renderScenarioReport(getCurrentScenario())
 : renderReportEmpty());
 const reportTitle = getCurrentScenario() && getCurrentScenario().title
-? ‘<span class="panel-title">Report · <span class="scenario-title-inline">’ + escapeHTML(getCurrentScenario().title) + ‘</span></span>’
-: ‘<span class="panel-title">Report</span>’;
-return ‘<div class="upper-strip">’ +
-‘<section class="graph-panel">’ +
-‘<div class="panel-header">’ +
-‘<span class="panel-title">Subgraph</span>’ +
-‘<button class="panel-action panel-action-btn" id="graph-expand-btn" type="button" aria-label="Open graph fullscreen">Expand</button>’ +
-‘</div>’ +
-‘<div class="graph-svg-wrap" id="subgraph-container-inline"></div>’ +
+? '<span class="panel-title">Report · <span class="scenario-title-inline">' + escapeHTML(getCurrentScenario().title) + '</span></span>'
+: '<span class="panel-title">Report</span>';
+return '<div class="upper-strip">' +
+'<section class="graph-panel">' +
+'<div class="panel-header">' +
+'<span class="panel-title">Subgraph</span>' +
+'<button class="panel-action panel-action-btn" id="graph-expand-btn" type="button" aria-label="Open graph fullscreen">Expand</button>' +
+'</div>' +
+'<div class="graph-svg-wrap" id="subgraph-container-inline"></div>' +
 renderSubgraphLegend(false) +
-‘</section>’ +
-‘<aside class="intel-panel">’ +
-‘<div class="panel-header"><span class="panel-title">Intel</span></div>’ +
-‘<div class="intel-body">’ + renderIntel(computeScenarioIntel()) + ‘</div>’ +
-‘</aside>’ +
-‘</div>’ +
-‘<section class="report-panel">’ +
-‘<div class="panel-header">’ +
+'</section>' +
+'<aside class="intel-panel">' +
+'<div class="panel-header"><span class="panel-title">Intel</span></div>' +
+'<div class="intel-body">' + renderIntel(computeScenarioIntel()) + '</div>' +
+'</aside>' +
+'</div>' +
+'<section class="report-panel">' +
+'<div class="panel-header">' +
 reportTitle +
-‘<div class="report-header-right">’ +
-‘<button class="download-btn" title="Download report"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span>PDF</span></button>’ +
-‘</div>’ +
-‘</div>’ +
-‘<div class="report-scroll">’ + reportBody + ‘</div>’ +
-‘</section>’;
+'<div class="report-header-right">' +
+'<button class="download-btn" title="Download report"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg><span>PDF</span></button>' +
+'</div>' +
+'</div>' +
+'<div class="report-scroll">' + reportBody + '</div>' +
+'</section>';
 }
 
 function renderSubgraphLegend(fullscreen) {
-const sz = fullscreen ? ‘’ : ’ compact’;
-return ‘<div class="subgraph-legend-bar' + sz + '">’ +
-‘<div class="sg-leg-sec"><strong>Nodes</strong>’ +
-‘<span class="sg-leg-item"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#d1fae5" stroke="#10b981" stroke-width="1.3"/></svg>Actor</span>’ +
-‘<span class="sg-leg-item"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#fef3c7" stroke="#d97706" stroke-width="1.3"/></svg>Asset</span>’ +
-‘</div>’ +
-‘<div class="sg-leg-sec"><strong>Edges</strong>’ +
-‘<span class="sg-leg-item"><svg width="22" height="8"><line x1="2" y1="4" x2="16" y2="4" stroke="#ef4444" stroke-width="2.2" opacity="0.85"/><polygon points="16,1 21,4 16,7" fill="#ef4444"/></svg>Negative</span>’ +
-‘<span class="sg-leg-item"><svg width="22" height="8"><line x1="2" y1="4" x2="16" y2="4" stroke="#10b981" stroke-width="2.2" opacity="0.85"/><polygon points="16,1 21,4 16,7" fill="#10b981"/></svg>Positive</span>’ +
-‘<span class="sg-leg-item sg-muted">thickness = weight</span>’ +
-‘</div>’ +
-‘<div class="sg-leg-sec"><strong>Volatility</strong>’ +
-‘<span class="sg-leg-item"><span class="sg-vol-pill sg-vol-h">H</span>High</span>’ +
-‘<span class="sg-leg-item"><span class="sg-vol-pill sg-vol-m">M</span>Med</span>’ +
-‘<span class="sg-leg-item"><span class="sg-vol-pill sg-vol-l">L</span>Low</span>’ +
-‘</div>’ +
-‘</div>’ +
-‘<details class="subgraph-glossary">’ +
-‘<summary>Mechanisms glossary</summary>’ +
-‘<div class="sg-glos-body">’ +
-‘<div class="sg-glos-item"><strong>Coercion</strong>Direct pressure to bend the target's will.</div>’ +
-‘<div class="sg-glos-item"><strong>Deterrence</strong>Forward posture raising the cost of aggressive action.</div>’ +
-‘<div class="sg-glos-item"><strong>Enabling</strong>Indirect support that multiplies a partner's capability.</div>’ +
-‘<div class="sg-glos-item"><strong>Basing</strong>Physical access to territory, ports, airfields.</div>’ +
-‘<div class="sg-glos-item"><strong>Economic pressure</strong>Commercial and financial leverage.</div>’ +
-‘</div>’ +
-‘</details>’;
+const sz = fullscreen ? '' : ' compact';
+return '<div class="subgraph-legend-bar' + sz + '">' +
+'<div class="sg-leg-sec"><strong>Nodes</strong>' +
+'<span class="sg-leg-item"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#d1fae5" stroke="#10b981" stroke-width="1.3"/></svg>Actor</span>' +
+'<span class="sg-leg-item"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#fef3c7" stroke="#d97706" stroke-width="1.3"/></svg>Asset</span>' +
+'</div>' +
+'<div class="sg-leg-sec"><strong>Edges</strong>' +
+'<span class="sg-leg-item"><svg width="22" height="8"><line x1="2" y1="4" x2="16" y2="4" stroke="#ef4444" stroke-width="2.2" opacity="0.85"/><polygon points="16,1 21,4 16,7" fill="#ef4444"/></svg>Negative</span>' +
+'<span class="sg-leg-item"><svg width="22" height="8"><line x1="2" y1="4" x2="16" y2="4" stroke="#10b981" stroke-width="2.2" opacity="0.85"/><polygon points="16,1 21,4 16,7" fill="#10b981"/></svg>Positive</span>' +
+'<span class="sg-leg-item sg-muted">thickness = weight</span>' +
+'</div>' +
+'<div class="sg-leg-sec"><strong>Volatility</strong>' +
+'<span class="sg-leg-item"><span class="sg-vol-pill sg-vol-h">H</span>High</span>' +
+'<span class="sg-leg-item"><span class="sg-vol-pill sg-vol-m">M</span>Med</span>' +
+'<span class="sg-leg-item"><span class="sg-vol-pill sg-vol-l">L</span>Low</span>' +
+'</div>' +
+'</div>' +
+'<details class="subgraph-glossary">' +
+'<summary>Mechanisms glossary</summary>' +
+'<div class="sg-glos-body">' +
+'<div class="sg-glos-item"><strong>Coercion</strong>Direct pressure to bend the target\'s will.</div>' +
+'<div class="sg-glos-item"><strong>Deterrence</strong>Forward posture raising the cost of aggressive action.</div>' +
+'<div class="sg-glos-item"><strong>Enabling</strong>Indirect support that multiplies a partner\'s capability.</div>' +
+'<div class="sg-glos-item"><strong>Basing</strong>Physical access to territory, ports, airfields.</div>' +
+'<div class="sg-glos-item"><strong>Economic pressure</strong>Commercial and financial leverage.</div>' +
+'</div>' +
+'</details>';
 }
 
 function renderReportEmpty() {
-return ‘<div class="report-empty">’ +
-‘<div class="report-empty-inner">’ +
-‘<div class="report-empty-title">Nessuno scenario generato</div>’ +
-‘<div class="report-empty-body">Chiedi qualcosa nella chat a sinistra per generare uno scenario.</div>’ +
-‘</div>’ +
-‘</div>’;
+return '<div class="report-empty">' +
+'<div class="report-empty-inner">' +
+'<div class="report-empty-title">Nessuno scenario generato</div>' +
+'<div class="report-empty-body">Chiedi qualcosa nella chat a sinistra per generare uno scenario.</div>' +
+'</div>' +
+'</div>';
 }
 
 function renderReportLoader() {
-return ‘<div class="report-empty">’ +
-‘<div class="report-empty-inner">’ +
-‘<div class="report-empty-title">Generazione in corso<span class="dots"></span></div>’ +
-‘<div class="report-empty-body">Sto componendo il report e isolando il sotto-grafo rilevante.</div>’ +
-‘</div>’ +
-‘</div>’;
+return '<div class="report-empty">' +
+'<div class="report-empty-inner">' +
+'<div class="report-empty-title">Generazione in corso<span class="dots"></span></div>' +
+'<div class="report-empty-body">Sto componendo il report e isolando il sotto-grafo rilevante.</div>' +
+'</div>' +
+'</div>';
 }
 
 function renderScenarioReport(scenario) {
@@ -438,7 +438,7 @@ return scenario.report_html || renderReportEmpty();
 
 // ============ MAP RENDERING ============
 function renderLand() {
-if (!WORLD_LAND) return ‘’;
+if (!WORLD_LAND) return '';
 const parts = [];
 for (let i = 0; i < WORLD_LAND.length; i++) {
 const ring = WORLD_LAND[i];
@@ -455,7 +455,7 @@ for (let j = 0; j < ring.length; j++) {
 const p = projectToSVG(ring[j][0], ring[j][1], MAP_W, MAP_H);
 pts.push(p.x.toFixed(1) + "," + p.y.toFixed(1));
 }
-parts.push(’<polygon points="’ + pts.join(" ") + ‘"/>’);
+parts.push('<polygon points="' + pts.join(" ") + '"/>');
 }
 return parts.join("");
 }
@@ -467,37 +467,37 @@ const dossiers = c.dossier_ids.map(function(id) { return CHESS_DATA.dossiers[id]
 const count = dossiers.length;
 const hasData = count > 0;
 const countLabel = hasData
-? ‘<text class="cluster-count" y="5" text-anchor="middle">’ + count + ‘</text>’
-: ‘’;
+? '<text class="cluster-count" y="5" text-anchor="middle">' + count + '</text>'
+: '';
 const labelSize = (14 * labelScale).toFixed(1);
 const ringR = hasData ? 36 : 26;
 const dotR = hasData ? 14 : 9;
 const isHidden = ATLAS_VIEW.level === "region" && ATLAS_VIEW.clusterId !== c.id;
-return ‘<g class="cluster-marker ’ + (hasData ? "has-data" : "empty") + ’ interactive’ + (isHidden ? ’ hidden’ : ‘’) + ‘"’ +
-’ data-cluster-id="’ + c.id + ‘"’ +
-’ transform="translate(’ + p.x.toFixed(1) + ’ ’ + p.y.toFixed(1) + ‘)">’ +
-‘<circle class="cluster-ring" r="' + ringR + '" fill="none" stroke="currentColor" stroke-width="1" opacity="0.25"/>’ +
-‘<circle class="cluster-dot" r="' + dotR + '"/>’ +
+return '<g class="cluster-marker ' + (hasData ? "has-data" : "empty") + ' interactive' + (isHidden ? ' hidden' : '') + '"' +
+' data-cluster-id="' + c.id + '"' +
+' transform="translate(' + p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ')">' +
+'<circle class="cluster-ring" r="' + ringR + '" fill="none" stroke="currentColor" stroke-width="1" opacity="0.25"/>' +
+'<circle class="cluster-dot" r="' + dotR + '"/>' +
 countLabel +
-‘<text class="cluster-label" y="' + (dotR + 18).toFixed(0) + '" text-anchor="middle" style="font-size:' + labelSize + 'px">’ + c.label + ‘</text>’ +
-‘</g>’;
+'<text class="cluster-label" y="' + (dotR + 18).toFixed(0) + '" text-anchor="middle" style="font-size:' + labelSize + 'px">' + c.label + '</text>' +
+'</g>';
 }).join("");
 }
 
 function renderRegionDossierMarkers(clusterId, labelScale) {
 const c = CHESS_DATA.clusters.find(function(x) { return x.id === clusterId; });
-if (!c) return ‘’;
+if (!c) return '';
 return c.dossier_ids.map(function(id) {
 const d = CHESS_DATA.dossiers[id];
-if (!d || d.lon == null || d.lat == null) return ‘’;
+if (!d || d.lon == null || d.lat == null) return '';
 const p = projectToSVG(d.lon, d.lat, MAP_W, MAP_H);
 const labelSize = (12 * labelScale).toFixed(1);
-return ‘<g class="dossier-marker" data-dossier-id="’ + d.id + ‘"’ +
-’ transform="translate(’ + p.x.toFixed(1) + ’ ’ + p.y.toFixed(1) + ‘)">’ +
-‘<circle class="dossier-halo" r="14" opacity="0.3"/>’ +
-‘<circle class="dossier-dot" r="6"/>’ +
-‘<text class="dossier-label" y="-14" text-anchor="middle" style="font-size:' + labelSize + 'px">’ + d.title + ‘</text>’ +
-‘</g>’;
+return '<g class="dossier-marker" data-dossier-id="' + d.id + '"' +
+' transform="translate(' + p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ')">' +
+'<circle class="dossier-halo" r="14" opacity="0.3"/>' +
+'<circle class="dossier-dot" r="6"/>' +
+'<text class="dossier-label" y="-14" text-anchor="middle" style="font-size:' + labelSize + 'px">' + d.title + '</text>' +
+'</g>';
 }).join("");
 }
 
@@ -510,12 +510,12 @@ if (!d) return "";
 const angle = -Math.PI / 2 + (i - (transIds.length - 1) / 2) * 0.4;
 const cx = MAP_W / 2 + Math.cos(angle) * (MAP_W * 0.42);
 const cy = MAP_H / 2 + Math.sin(angle) * (MAP_H * 0.55);
-return ‘<g class="orbital-item interactive" data-dossier-id="’ + d.id + ‘"’ +
-’ transform="translate(’ + cx.toFixed(1) + ’ ’ + cy.toFixed(1) + ‘)">’ +
-‘<circle r="22" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3" stroke-dasharray="2,3"/>’ +
-‘<circle class="orbital-dot" r="10"/>’ +
-‘<text class="orbital-label" y="-32" text-anchor="middle" style="font-size:' + labelSize + 'px">’ + d.title + ‘</text>’ +
-‘</g>’;
+return '<g class="orbital-item interactive" data-dossier-id="' + d.id + '"' +
+' transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
+'<circle r="22" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3" stroke-dasharray="2,3"/>' +
+'<circle class="orbital-dot" r="10"/>' +
+'<text class="orbital-label" y="-32" text-anchor="middle" style="font-size:' + labelSize + 'px">' + d.title + '</text>' +
+'</g>';
 }).join("");
 }
 
@@ -685,32 +685,32 @@ console.warn("Archive write failed:", e);
 function renderArchiveDrawer() {
 const archive = loadArchive();
 const items = archive.length === 0
-? ‘<div class="archive-empty">No archived conversations yet.</div>’
+? '<div class="archive-empty">No archived conversations yet.</div>'
 : archive.map(function(entry, idx) {
 const firstUser = (entry.messages || []).find(function(m) { return m.role === "user"; });
 const title = firstUser ? stripHTML(firstUser.text) : "(empty conversation)";
 const started = new Date(entry.startedAt);
 const dateLabel = started.toLocaleDateString() + " · " + String(started.getHours()).padStart(2,"0") + ":" + String(started.getMinutes()).padStart(2,"0");
 const count = (entry.messages || []).length;
-return ‘<div class="archive-item" data-archive-idx="' + idx + '">’ +
-‘<div class="archive-item-main">’ +
-‘<div class="archive-item-title">’ + escapeHTML(title) + ‘</div>’ +
-‘<div class="archive-item-meta">’ + dateLabel + ’ · ’ + count + ’ msg</div>’ +
-‘</div>’ +
-‘<button class="archive-delete" data-archive-idx="' + idx + '" title="Delete">x</button>’ +
-‘</div>’;
+return '<div class="archive-item" data-archive-idx="' + idx + '">' +
+'<div class="archive-item-main">' +
+'<div class="archive-item-title">' + escapeHTML(title) + '</div>' +
+'<div class="archive-item-meta">' + dateLabel + ' · ' + count + ' msg</div>' +
+'</div>' +
+'<button class="archive-delete" data-archive-idx="' + idx + '" title="Delete">x</button>' +
+'</div>';
 }).join("");
 const clearAllBtn = archive.length > 0
-? ‘<button class="archive-clear-all" id="archive-clear-all">Clear all</button>’
-: ‘’;
-return ‘<aside class="archive-drawer" role="dialog" aria-label="Archived chats">’ +
-‘<div class="archive-header">’ +
-‘<span class="archive-title">Archive</span>’ +
-‘<button class="archive-close" id="archive-close" title="Close">x</button>’ +
-‘</div>’ +
-‘<div class="archive-body">’ + items + ‘</div>’ +
-(clearAllBtn ? ‘<div class="archive-footer">’ + clearAllBtn + ‘</div>’ : ‘’) +
-‘</aside>’;
+? '<button class="archive-clear-all" id="archive-clear-all">Clear all</button>'
+: '';
+return '<aside class="archive-drawer" role="dialog" aria-label="Archived chats">' +
+'<div class="archive-header">' +
+'<span class="archive-title">Archive</span>' +
+'<button class="archive-close" id="archive-close" title="Close">x</button>' +
+'</div>' +
+'<div class="archive-body">' + items + '</div>' +
+(clearAllBtn ? '<div class="archive-footer">' + clearAllBtn + '</div>' : '') +
+'</aside>';
 }
 
 function wireArchiveDrawer() {
@@ -814,7 +814,7 @@ framesSeen = framesSeen + 1;
 if (frame.type === "done") return frame.payload || {};
 }
 }
-throw new Error("NDJSON stream ended without a ‘done’ frame (frames seen: " + framesSeen + ")");
+throw new Error("NDJSON stream ended without a 'done' frame (frames seen: " + framesSeen + ")");
 }
 buffer = buffer + decoder.decode(chunk.value, { stream: true });
 let nl = buffer.indexOf("\n");
@@ -859,7 +859,7 @@ framesSeen = framesSeen + 1;
 if (frame.type === "start" || frame.type === "heartbeat") continue;
 if (frame.type === "done") return frame.payload || {};
 }
-throw new Error("NDJSON body had no ‘done’ frame (frames seen: " + framesSeen + ")");
+throw new Error("NDJSON body had no 'done' frame (frames seen: " + framesSeen + ")");
 }
 
 function handleChatSubmit(text) {
@@ -1009,7 +1009,7 @@ return hh + ":" + mm;
 }
 
 function escapeHTML(s) {
-return String(s == null ? "" : s).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """);
+return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function escapeHTMLForChat(s) {
@@ -1038,7 +1038,7 @@ const keySet = {};
 const entities = kg.entities.filter(function(e) { return idSet[e.id]; });
 const relations = kg.relations.filter(function(r) { return keySet[r.from + "|" + r.to + "|" + r.type]; });
 if (entities.length === 0) {
-container.innerHTML = ‘<div class="sg-empty">No subgraph for this scenario.</div>’;
+container.innerHTML = '<div class="sg-empty">No subgraph for this scenario.</div>';
 return;
 }
 const vbW = fullscreen ? 1280 : 720;
@@ -1465,10 +1465,10 @@ const label = evidenceStrengthLabel(value);
 const item = document.createElement("div");
 item.className = "headline-item evidence-strength";
 item.innerHTML =
-‘<span class="headline-label">Evidence strength</span>’ +
-‘<span class="headline-value">’ + value.toFixed(2) +
-’ <span class="headline-range">’ + escapeHTML(label) + ‘</span>’ +
-‘</span>’;
+'<span class="headline-label">Evidence strength</span>' +
+'<span class="headline-value">' + value.toFixed(2) +
+' <span class="headline-range">' + escapeHTML(label) + '</span>' +
+'</span>';
 panel.appendChild(item);
 }
 
@@ -1533,18 +1533,18 @@ console.warn("Graph snapshot failed:", err);
 }
 const reportBody = reportEl.outerHTML;
 const snapshotBlock = graphPng
-? ‘<div class="pdf-section">’ +
-‘<h2 class="pdf-section-title">Subgraph</h2>’ +
-‘<p class="pdf-section-sub">Entities and relations highlighted in this scenario.</p>’ +
-‘<img src="' + graphPng + '" style="width:100%; height:auto;" />’ +
-‘</div>’
-: ‘’;
+? '<div class="pdf-section">' +
+'<h2 class="pdf-section-title">Subgraph</h2>' +
+'<p class="pdf-section-sub">Entities and relations highlighted in this scenario.</p>' +
+'<img src="' + graphPng + '" style="width:100%; height:auto;" />' +
+'</div>'
+: '';
 const wrapper = document.createElement("div");
 wrapper.style.padding = "20px";
-wrapper.style.fontFamily = "‘Fraunces’, Georgia, serif";
+wrapper.style.fontFamily = "'Fraunces', Georgia, serif";
 wrapper.innerHTML =
-‘<div class="pdf-section">’ + reportBody + ‘</div>’ +
-(snapshotBlock ? ‘<div class="pdf-page-break"></div>’ + snapshotBlock : ‘’);
+'<div class="pdf-section">' + reportBody + '</div>' +
+(snapshotBlock ? '<div class="pdf-page-break"></div>' + snapshotBlock : '');
 const filename = "geointel-scenario-" + scenario.id + ".pdf";
 html2pdf().from(wrapper).set({
 margin: [10, 10, 10, 10],
@@ -1593,20 +1593,20 @@ URL.revokeObjectURL(url);
 // ============ MESSAGE / INTEL ============
 function renderMessage(m) {
 if (m.role === "user") {
-return ‘<div class="msg user"><div class="msg-bubble">’ + m.text + ‘</div><div class="msg-time">’ + m.time + ‘</div></div>’;
+return '<div class="msg user"><div class="msg-bubble">' + m.text + '</div><div class="msg-time">' + m.time + '</div></div>';
 }
 if (m.role === "scenario-card") {
 const active = getCurrentScenario() && getCurrentScenario().id === m.scenario_id ? " active" : "";
-return ‘<div class="scenario-card' + active + '" data-scenario-id="' + escapeHTML(m.scenario_id) + '" role="button" tabindex="0">’ +
-‘<div class="scenario-card-label">Scenario generated</div>’ +
-‘<div class="scenario-card-title">’ + escapeHTML(m.scenario_title || "Scenario") + ‘</div>’ +
-‘<div class="scenario-card-hint">Tap to recall this scenario</div>’ +
-‘</div>’;
+return '<div class="scenario-card' + active + '" data-scenario-id="' + escapeHTML(m.scenario_id) + '" role="button" tabindex="0">' +
+'<div class="scenario-card-label">Scenario generated</div>' +
+'<div class="scenario-card-title">' + escapeHTML(m.scenario_title || "Scenario") + '</div>' +
+'<div class="scenario-card-hint">Tap to recall this scenario</div>' +
+'</div>';
 }
 const typeTag = m.type && m.type !== "welcome"
-? ‘<div class="msg-type-tag">’ + m.type.replace(/_/g, " ") + ‘</div>’
-: ‘’;
-return ‘<div class="msg ai"><div class="msg-bubble">’ + m.text + ‘</div>’ + typeTag + ‘<div class="msg-time">’ + m.time + ‘</div></div>’;
+? '<div class="msg-type-tag">' + m.type.replace(/_/g, " ") + '</div>'
+: '';
+return '<div class="msg ai"><div class="msg-bubble">' + m.text + '</div>' + typeTag + '<div class="msg-time">' + m.time + '</div></div>';
 }
 
 function recallScenario(id) {
@@ -1632,31 +1632,31 @@ const polaritySign = a.polarity === "neg" ? "-" : "+";
 const barStyle = a.polarity === "pos"
 ? "width:" + Math.round(a.weight * 100) + "%;background:linear-gradient(90deg,#15803d 0%,#0d7a6e 100%)"
 : "width:" + Math.round(a.weight * 100) + "%";
-return ‘<div class="arc-item">’ +
-‘<div class="arc-flow"><span class="arc-node">’ + a.from + ‘</span><span class="arc-arrow">-></span><span class="arc-node">’ + a.to + ‘</span></div>’ +
-‘<div class="arc-props"><span>’ + a.type + ’</span><span><span class="weight">w ’ + a.weight.toFixed(2) + ‘</span> · <span class="polarity ' + a.polarity + '">’ + polaritySign + ’</span> · vol ’ + a.volatility + ‘</span></div>’ +
-‘<div class="arc-bar"><div class="arc-bar-fill" style="' + barStyle + '"></div></div>’ +
-‘</div>’;
+return '<div class="arc-item">' +
+'<div class="arc-flow"><span class="arc-node">' + a.from + '</span><span class="arc-arrow">-></span><span class="arc-node">' + a.to + '</span></div>' +
+'<div class="arc-props"><span>' + a.type + '</span><span><span class="weight">w ' + a.weight.toFixed(2) + '</span> · <span class="polarity ' + a.polarity + '">' + polaritySign + '</span> · vol ' + a.volatility + '</span></div>' +
+'<div class="arc-bar"><div class="arc-bar-fill" style="' + barStyle + '"></div></div>' +
+'</div>';
 }).join("");
-return ‘<div class="intel-section">’ +
-‘<div class="intel-header"><span class="intel-sec-title">Evidence strength</span></div>’ +
-‘<div class="confidence-block">’ +
-‘<div class="gauge">’ +
-‘<svg width="58" height="58" viewBox="0 0 58 58">’ +
-‘<circle cx="29" cy="29" r="23" fill="none" stroke="#ebe8df" stroke-width="5"/>’ +
+return '<div class="intel-section">' +
+'<div class="intel-header"><span class="intel-sec-title">Evidence strength</span></div>' +
+'<div class="confidence-block">' +
+'<div class="gauge">' +
+'<svg width="58" height="58" viewBox="0 0 58 58">' +
+'<circle cx="29" cy="29" r="23" fill="none" stroke="#ebe8df" stroke-width="5"/>' +
 (hasValue
-? ‘<circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>’
-: ‘’) +
-‘</svg>’ +
-‘<div class="gauge-text">’ + (hasValue ? E.value.toFixed(2) : "-") + ‘</div>’ +
-‘</div>’ +
-‘<div class="confidence-meta"><div class="big">’ + (hasValue ? smallLabel : bigLabel) + ‘</div><div class="small">’ + escapeHTML(E.note || "") + ‘</div></div>’ +
-‘</div>’ +
-‘</div>’ +
+? '<circle cx="29" cy="29" r="23" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-dasharray="' + circumference.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>'
+: '') +
+'</svg>' +
+'<div class="gauge-text">' + (hasValue ? E.value.toFixed(2) : "-") + '</div>' +
+'</div>' +
+'<div class="confidence-meta"><div class="big">' + (hasValue ? smallLabel : bigLabel) + '</div><div class="small">' + escapeHTML(E.note || "") + '</div></div>' +
+'</div>' +
+'</div>' +
 (arcsHTML
-? ‘<div class="intel-section">’ +
-‘<div class="intel-header"><span class="intel-sec-title">Top arcs</span><span class="panel-meta">’ + intel.top_arcs.length + ‘</span></div>’ +
-‘<div class="arc-list">’ + arcsHTML + ‘</div>’ +
-‘</div>’
-: ‘’);
+? '<div class="intel-section">' +
+'<div class="intel-header"><span class="intel-sec-title">Top arcs</span><span class="panel-meta">' + intel.top_arcs.length + '</span></div>' +
+'<div class="arc-list">' + arcsHTML + '</div>' +
+'</div>'
+: '');
 }
