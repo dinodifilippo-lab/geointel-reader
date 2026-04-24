@@ -226,3 +226,121 @@ Light editorial, non dark.
   trans-geografici.
 - **Context Factor**: testo annotato su un arco, che descrive condizioni o
   fattori che qualificano la relazione.
+
+---
+
+## 9. Stato corrente (aprile 2026)
+
+Sezione operativa. Aggiornata a ogni milestone significativo.
+
+### 9.1 Versioni
+
+- **Frontend**: `app.js` v2.4.5, `index.html` v2.4.5.
+- **Dataset**: `data.js` v2.0.0 (KG 77 entities + 77 relations,
+  `brief_text` per 6 dossier: russia-ukraine, iran-hormuz, iran-usa,
+  taiwan-strait, ai-us-china, red-sea-houthis).
+- **Edge Function** `geointel-reader-chat`: streaming NDJSON
+  (classifier buffered + generator streamed con frame start /
+  heartbeat / done). Modelli: `claude-haiku-4-5-20251001`
+  (classifier, max_tokens 800), `claude-sonnet-4-5-20250929`
+  (generator, max_tokens 5000). Il source vive solo su Supabase
+  dashboard, non nel repo.
+
+### 9.2 Transport contract frontend - Edge Function
+
+- **Fase classifier** (~5 s): `Content-Type: application/json`,
+  buffered, body tipizzato (`welcome`, `clarification`,
+  `ready_to_generate`, `out_of_scope`, `acknowledge`,
+  `scenario_followup`).
+- **Fase generator** (~50 s): `Content-Type: application/x-ndjson`,
+  streaming. Frame per riga:
+  - `{"type":"start"}` al boot.
+  - `{"type":"heartbeat","t":<ms>}` ogni ~15 s.
+  - `{"type":"done","payload":{type,message,scenario,debug}}` a
+    fine generazione. `scenario` porta i campi v2.3 piu' il
+    `critical_edges: [{src_id, dst_id, mechanism, volatility}]`
+    aggiunto in v2.4 (3-5 archi citati dal report, subset di
+    `relation_keys`).
+
+Il frontend (`readNdjsonDone` in `app.js`) discrimina sul
+Content-Type: NDJSON -> drain ReadableStream, ignora
+start/heartbeat, restituisce il payload del done; altrimenti path
+legacy buffered. `handleResponse` non vede la differenza.
+
+### 9.3 Nota importante su Cloudflare buffering (non risolto lato frontend)
+
+Il proxy Supabase davanti all'Edge Function a volte bufferizza lo
+stream NDJSON invece di passarlo through, facendo morire il fetch
+client-side con `TypeError: Load failed` dopo ~50 s. Sintomo: i log
+Supabase mostrano start + heartbeat + done tutti emessi a tempo,
+ma il browser vede solo headers e poi silenzio. **Fix richiesto
+lato Edge Function**: aggiungere header `X-Accel-Buffering: no` (e
+idealmente `Connection: keep-alive`) al Response del branch
+streaming. Non tentare fix lato frontend - il parser NDJSON e' gia'
+corretto, il problema e' che i chunk non arrivano.
+
+### 9.4 Feature attive in frontend (per mappa mentale)
+
+1. **Scenario projection mode** (chat -> classifier -> conferma ->
+   generator -> report + subgraph + scenario card).
+2. **`scenarioHistory[]`** client-side con `currentScenarioIndex`,
+   scenario card cliccabile in chat per recall senza backend call.
+3. **Subgraph SVG** con sg-svg filling parent via CSS (width/height
+   100%, `preserveAspectRatio="xMidYMid meet"`), force-directed
+   layout `computeForceLayoutV24`, con callout per critical edges
+   e label inline per archi ordinari.
+4. **Polarity color mapping granulare** (v2.4.4):
+   `pos` / `pos-*` -> verde, esattamente `neg` -> rosso,
+   `neg-*` / `variable` / `systemic` / `commercial` / altro ->
+   grigio. I `neg-West`, `neg-China`, ecc. sono allineamenti
+   contro terzi, non antagonismi bilaterali.
+5. **Orphan entity filter** (v2.4.4, in `handleResponse`): a
+   costruzione `scenarioObj`, filtra `entity_ids` tenendo solo
+   quelli referenziati come `from` o `to` in almeno un
+   `relation_key`. `debugLog("SCENARIO ORPHANS REMOVED", ...)`
+   se Sonnet over-selecta.
+6. **Legenda subgraph** spaziata con flex + divider, presente sia
+   inline che nell'overlay fullscreen (renderSubgraphLegend(true)).
+7. **PDF export** via `html2pdf.bundle.min.js` da jsdelivr, SVG-
+   first snapshot con inline dei computed style sul clone, `.save()`
+   unconditional. **Stato**: su iPad Safari `.save()` usa anchor
+   `<a download>` che non e' supportato - il PDF si apre nella tab
+   corrente sovrascrivendo l'app. Tema aperto, decisione utente
+   attuale e' tornare al fallback `window.print()` (richiesta
+   `typeof html2canvas === "function"` nel check, che fallisce
+   perche' il bundle non espone html2canvas, e cade su
+   `window.print()`). Il grafo in PDF non funziona ancora - tema
+   aperto.
+8. **On-screen debug log** (ring buffer 40 entry) con bottone
+   `copy` (TSV), indispensabile su iPad (no DevTools). Render()
+   si triggera da `debugLog` solo dove esplicitamente chiamato
+   (es. PDF lifecycle).
+9. **Password gate** (v2.4.5, nuovo): overlay fullscreen all'avvio.
+   SHA-256 della password inserita confrontato con due hash
+   autorizzati (user + emergency) via `crypto.subtle.digest`.
+   Match -> flag `gir_auth_ok` in `sessionStorage`, gate saltato
+   per il resto della tab session. No match -> "Password errata".
+   Idempotente contro render asincroni concorrenti (check su
+   `#auth-form` presente).
+
+### 9.5 Temi aperti (in ordine di priorita')
+
+- **PDF**: grafo non appare, `window.print()` e' il fallback
+  attuale. Serve decisione strategica: (a) accettare print
+  dialog nativo di Safari come UX, (b) rifare lato server con
+  generazione PDF su Edge Function + share sheet, (c) altro.
+- **Cloudflare buffering**: aggiungere `X-Accel-Buffering: no`
+  nel Response streaming dell'Edge Function per eliminare il bug
+  intermittente del fetch che muore a ~50 s.
+
+### 9.6 Workflow iPad - memo
+
+- Commit diretti su `main`. Vercel deploya in automatico a ogni
+  push. Working Copy su iPad: `Pull` (non solo `Fetch`) per
+  aggiornare i file dopo merge.
+- Per debug isolato dell'Edge Function: Supabase Dashboard ->
+  Edge Functions -> `geointel-reader-chat` -> Test panel.
+- On-screen debug log in chat panel: ring buffer, bottone `copy`.
+- iOS Safari: disattivare "Punteggiatura intelligente" prima di
+  editare `.js` nel progetto (altrimenti autocorrect converte
+  apostrofi dritti in curly quotes che rompono il parse).
