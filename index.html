@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- GeoIntel Reader v2.4.4 -->
+<!-- GeoIntel Reader v2.4.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -555,6 +555,20 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
   .snapshot-query { padding: 0 0 8mm 0 !important; max-width: none !important; }
   a { color: #111 !important; text-decoration: none !important; }
 }
+
+/* === v2.4.5 Password gate === */
+.auth-gate { position: fixed; inset: 0; z-index: 1000; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 40px; }
+.auth-box { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; padding: 28px 28px 24px; background: #ffffff; border: 1px solid var(--line-hair, #c4bfb1); border: 1px solid #c4bfb1; border-radius: 12px; box-shadow: 0 2px 14px rgba(0,0,0,0.04); }
+.auth-brand { display: flex; align-items: center; gap: 10px; font-family: 'Fraunces', serif; font-weight: 600; font-size: 22px; letter-spacing: -0.01em; color: var(--text-1); margin-bottom: 10px; }
+.auth-brand-mark { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, var(--teal) 0%, var(--violet) 100%); display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; color: #ffffff; flex: 0 0 auto; }
+.auth-brand em { font-style: normal; color: var(--gold); font-weight: 400; margin: 0 2px; }
+.auth-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-top: 4px; }
+.auth-input { width: 100%; padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--text-1); background: #fafaf7; border: 1px solid #c4bfb1; border-radius: 7px; outline: none; transition: border-color 0.15s ease, background 0.15s ease; }
+.auth-input:focus { border-color: var(--teal); background: #ffffff; }
+.auth-btn { padding: 10px 14px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #ffffff; background: var(--text-1); border: none; border-radius: 7px; cursor: pointer; transition: background 0.15s ease; margin-top: 6px; }
+.auth-btn:hover { background: var(--teal); }
+.auth-btn:active { background: var(--teal); }
+.auth-error { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--coral); min-height: 16px; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -562,7 +576,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
 <header class="topbar">
 <a class="brand" href="#">
 <div class="brand-mark">G</div>
-<span>GeoIntel<em>·</em>Reader <span class="version">v2.4.4</span></span>
+<span>GeoIntel<em>·</em>Reader <span class="version">v2.4.5</span></span>
 </a>
 <div id="topbar-left-extra"></div>
 <div class="topbar-center" id="topbar-center"></div>

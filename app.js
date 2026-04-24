@@ -1,6 +1,6 @@
-// GeoIntel Reader - app.js - v2.4.4
+// GeoIntel Reader - app.js - v2.4.5
 
-const APP_VERSION = "2.4.4";
+const APP_VERSION = "2.4.5";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -138,7 +138,82 @@ console.warn("Archive save failed:", e);
 }
 
 // ============ RENDER ROOT ============
+// ============ PASSWORD GATE (v2.4.5) ============
+// Fullscreen overlay at boot. SHA-256 of the submitted password is
+// compared against the two allowed hashes below. On match, a flag is
+// stored in sessionStorage so the gate is skipped for the rest of
+// the tab session (cleared on tab close / new tab).
+const AUTH_HASHES = [
+"fbb6122ff2cd7daca25caee635349146f70e82e188a9614e18104d9b9581bccf",
+"c1c224b03cd9bc7b6a86d77f5dace40191766c485cd55dc48caf9ac873335d6f"
+];
+const AUTH_FLAG_KEY = "gir_auth_ok";
+
+async function authSha256Hex(s) {
+const enc = new TextEncoder().encode(String(s));
+const buf = await crypto.subtle.digest("SHA-256", enc);
+const bytes = new Uint8Array(buf);
+let hex = "";
+for (let i = 0; i < bytes.length; i = i + 1) {
+hex = hex + bytes[i].toString(16).padStart(2, "0");
+}
+return hex;
+}
+
+function isAuthorized() {
+try { return sessionStorage.getItem(AUTH_FLAG_KEY) === "1"; }
+catch (_) { return false; }
+}
+
+function markAuthorized() {
+try { sessionStorage.setItem(AUTH_FLAG_KEY, "1"); } catch (_) {}
+}
+
+function renderAuthGate() {
+const root = document.getElementById("app-root");
+if (!root) return;
+// Idempotent: if the gate is already mounted, do not tear it down
+// (a background async render() during typing would otherwise steal
+// focus from the password field).
+if (document.getElementById("auth-form")) return;
+root.innerHTML =
+'<div class="auth-gate">' +
+'<form class="auth-box" id="auth-form" autocomplete="off">' +
+'<div class="auth-brand">' +
+'<div class="auth-brand-mark">G</div>' +
+'<span>GeoIntel<em>&middot;</em>Reader</span>' +
+'</div>' +
+'<label class="auth-label" for="auth-input">Password</label>' +
+'<input type="password" id="auth-input" class="auth-input" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" />' +
+'<button type="submit" class="auth-btn">Entra</button>' +
+'<div class="auth-error" id="auth-error" role="alert" aria-live="polite"></div>' +
+'</form>' +
+'</div>';
+const form = document.getElementById("auth-form");
+const input = document.getElementById("auth-input");
+const errEl = document.getElementById("auth-error");
+if (input) setTimeout(function() { try { input.focus(); } catch (_) {} }, 0);
+if (form) form.addEventListener("submit", async function(e) {
+e.preventDefault();
+const pw = input && input.value ? String(input.value) : "";
+if (!pw) return;
+try {
+const h = await authSha256Hex(pw);
+if (AUTH_HASHES.indexOf(h) !== -1) {
+markAuthorized();
+render();
+} else {
+if (errEl) errEl.textContent = "Password errata";
+if (input) { input.value = ""; input.focus(); }
+}
+} catch (err) {
+if (errEl) errEl.textContent = "Errore di sistema";
+}
+});
+}
+
 function render() {
+if (!isAuthorized()) { renderAuthGate(); return; }
 const route = getRoute();
 const root = document.getElementById("app-root");
 if (!root) return;
