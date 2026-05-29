@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- GeoIntel Reader v2.4.5 -->
+<!-- GeoIntel Reader v2.5.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -556,6 +556,71 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
   a { color: #111 !important; text-decoration: none !important; }
 }
 
+/* === v2.5.0 active context pill (chat panel) === */
+.active-context-pill { flex: 0 0 auto; padding: 9px 14px; background: var(--bg-well); border-bottom: 1px solid #efece4; display: flex; flex-direction: column; gap: 3px; }
+.acp-row { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; line-height: 1.3; }
+.acp-label { flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.acp-value { flex: 1 1 auto; min-width: 0; font-family: 'Fraunces', serif; font-size: 13px; font-weight: 500; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acp-topic .acp-value { font-style: italic; font-weight: 400; color: var(--text-2); }
+
+/* === v2.5.0 structured RAG report sections === */
+.r-structured { display: flex; flex-direction: column; }
+.r-sec { padding: 22px 48px; border-bottom: 1px solid #efece4; }
+.r-sec:last-of-type { border-bottom: none; }
+.r-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); margin-bottom: 10px; }
+.r-tesi-body { font-family: 'Fraunces', serif; font-size: 17px; line-height: 1.55; color: var(--text-1); font-weight: 500; }
+.r-tesi-body p { margin: 0; }
+.r-evidenze-body, .r-implicazione-body { font-family: 'Fraunces', serif; font-size: 15px; line-height: 1.6; color: var(--text-2); }
+.r-evidenze-body p, .r-implicazione-body p { margin: 0 0 12px 0; }
+.r-evidenze-body h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 22px; letter-spacing: -0.015em; color: var(--text-1); margin: 16px 0 10px; }
+.r-evidenze-body h3 { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-2); margin: 14px 0 8px; }
+.r-evidenze-body ul.report-list { list-style: none; padding-left: 0; margin: 10px 0 14px; }
+.r-evidenze-body ul.report-list li { position: relative; padding: 8px 0 8px 22px; font-size: 14px; line-height: 1.55; color: var(--text-2); border-bottom: 1px dashed #d9d6ce; }
+.r-evidenze-body ul.report-list li::before { content: "◆"; position: absolute; left: 4px; top: 8px; color: var(--gold); font-size: 10px; }
+.r-sottografo-note { font-size: 13.5px; color: var(--text-2); }
+.r-inline-link { background: none; border: none; padding: 0; font: inherit; color: var(--teal); text-decoration: underline; cursor: pointer; }
+.r-fonti-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.r-fonti-list li { font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; color: var(--text-2); padding: 6px 10px; background: #fafaf7; border-left: 2px solid var(--gold); border-radius: 0 4px 4px 0; }
+.r-muted { color: var(--text-4); font-style: italic; font-size: 13px; }
+.r-dt-cta { padding: 24px 48px 32px; background: #fbfaf5; border-bottom: 1px solid #efece4; }
+.r-dt-hint { font-family: 'Fraunces', serif; font-size: 13.5px; font-style: italic; color: var(--text-2); margin-bottom: 12px; padding: 10px 14px; background: var(--gold-bg); border-left: 3px solid var(--gold); border-radius: 0 6px 6px 0; }
+.r-dt-hint strong { font-style: normal; font-weight: 700; color: var(--gold); }
+.r-dt-row { display: flex; flex-direction: column; gap: 10px; }
+.r-dt-btn { display: inline-flex; align-items: center; justify-content: space-between; padding: 12px 18px; background: var(--text-1); color: #ffffff; border: 1px solid var(--text-1); border-radius: 9px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; cursor: pointer; transition: all 0.15s ease; gap: 14px; }
+.r-dt-btn:hover:not(:disabled) { background: var(--teal); border-color: var(--teal); transform: translateY(-1px); }
+.r-dt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.r-dt-btn-label { flex: 1 1 auto; text-align: left; }
+.r-dt-cost { flex: 0 0 auto; padding: 3px 8px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+.dt-cost-low { background: rgba(21,128,61,0.25); border-color: rgba(21,128,61,0.55); }
+.dt-cost-medium { background: rgba(168,87,15,0.25); border-color: rgba(168,87,15,0.55); }
+.dt-cost-high { background: rgba(184,32,58,0.3); border-color: rgba(184,32,58,0.55); }
+.r-dt-caveat { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text-3); line-height: 1.5; }
+
+/* === v2.5.0 Deep-Think panel === */
+.dt-panel { padding: 0; background: #ffffff; border-top: 3px solid var(--violet); }
+.dt-panel.dt-loading { padding: 26px 48px; }
+.dt-loading-body { font-family: 'Fraunces', serif; font-style: italic; color: var(--text-3); font-size: 14px; margin-top: 6px; }
+.dt-header { padding: 22px 48px 6px; background: var(--violet-bg); }
+.dt-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--violet); margin-bottom: 4px; }
+.dt-title { font-family: 'Fraunces', serif; font-weight: 500; font-size: 22px; letter-spacing: -0.015em; color: var(--text-1); }
+.dt-revised-body { font-family: 'Fraunces', serif; font-size: 15.5px; line-height: 1.6; color: var(--text-1); }
+.dt-revised-body p { margin: 0; }
+.dt-tree-wrap, .dt-outcomes-wrap { background: #fafaf7; border: 1px solid #efece4; border-radius: 10px; padding: 14px; }
+.dt-tree-svg { width: 100%; height: auto; display: block; max-height: 420px; }
+.dt-tree-actor-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; fill: var(--text-1); letter-spacing: 0.04em; }
+.dt-tree-move-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; fill: var(--text-1); }
+.dt-tree-move-outcome { font-family: 'Inter', sans-serif; font-size: 8.5px; fill: var(--text-3); font-style: italic; }
+.dt-tree-prob { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; fill: var(--violet); }
+.dt-bar-chart { display: flex; flex-direction: column; gap: 8px; }
+.dt-bar-row { display: grid; grid-template-columns: 170px 1fr 44px; align-items: center; gap: 10px; }
+.dt-bar-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-2); font-weight: 600; }
+.dt-bar-track { height: 18px; background: #efece4; border-radius: 3px; overflow: hidden; }
+.dt-bar-fill { height: 100%; transition: width 0.3s ease; }
+.dt-bar-pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text-1); text-align: right; }
+.dt-caveat-body { font-family: 'Fraunces', serif; font-size: 13.5px; line-height: 1.6; color: var(--text-3); font-style: italic; }
+.dt-caveat-body p { margin: 0; }
+.dt-caveat-body strong { font-style: normal; font-weight: 600; color: var(--text-1); }
+
 /* === v2.4.5 Password gate === */
 .auth-gate { position: fixed; inset: 0; z-index: 1000; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 40px; }
 .auth-box { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; padding: 28px 28px 24px; background: #ffffff; border: 1px solid var(--line-hair, #c4bfb1); border: 1px solid #c4bfb1; border-radius: 12px; box-shadow: 0 2px 14px rgba(0,0,0,0.04); }
@@ -576,7 +641,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px sol
 <header class="topbar">
 <a class="brand" href="#">
 <div class="brand-mark">G</div>
-<span>GeoIntel<em>·</em>Reader <span class="version">v2.4.5</span></span>
+<span>GeoIntel<em>·</em>Reader <span class="version">v2.5.0</span></span>
 </a>
 <div id="topbar-left-extra"></div>
 <div class="topbar-center" id="topbar-center"></div>
