@@ -3,129 +3,122 @@
 Stato corrente del Reader e prossimi step concordati. Questo file cambia ad
 ogni release.
 
-**Ultima versione deployata**: v1.0.0
-**Ultimo aggiornamento**: 2026-04-21
+**Ultima versione deployata**: v2.4.5
+**Ultimo aggiornamento**: 2026-05-29
 
 ---
 
-## 1. Versione corrente — v1.0.0
+## 1. Versione corrente — v2.4.5
 
-Release di chiusura del mockup. Rispetto a v0.9.0 aggiunge: **grafo
-fullscreen overlay** (Expand button), **export PDF via print** (print
-stylesheet dedicato che isola il report), e **polish**: Esc globale
-chiude overlay/drawer/info-card, aria-label sui bottoni, focus ring
-consistente, basemap loading state nella subtitle.
+Demo live integrata con backend Supabase + Claude. Quattro file di codice
+(`index.html`, `app.js`, `data.js`, `world-110m.json`) + Edge Function su
+Supabase Dashboard. Sei dossier mock, KG globale (77 entities + 77 relations),
+subgraph engine v2.4 con force-directed layout, password gate SHA-256.
 
 ### 1.1 Architettura file
 
 - **3 file di codice + 1 asset dati in root**:
   - `index.html` — shell HTML + CSS completo.
-  - `data.js` — mock data (dossier, entità, archi, eventi, report,
-    descrizioni cluster/dossier).
-  - `app.js` — logica di routing, rendering, interazioni, chat mock.
-  - `world-110m.json` — basemap (Natural Earth 110m admin_0 countries,
-    288 polygons con border interni, minified ~150 KB).
-- Nessun framework, nessun build step. Pubblicato staticamente.
+  - `data.js` — KG globale + 6 dossier con `brief_text` per LLM context.
+  - `app.js` — logica routing/rendering/chat/subgraph/auth.
+  - `world-110m.json` — basemap Natural Earth 110m countries (~150 KB).
+- Backend: Edge Function `geointel-reader-chat` su Supabase (source vive
+  solo sulla dashboard, NON nel repo).
+- Nessun framework, nessun build step. Vercel zero-config.
 
 ### 1.2 Routing
 
-- Hash-based, due route:
-  - `#` (default) — working surface home: chat + Atlas cliccabile a destra.
-  - `#report/<N>` — working surface popolata sullo snapshot N generato
-    dalla chat. `<N>` è un indice globale numerico.
-  - `#report/<dossier-id>` — fallback/bookmark: apre il dossier statico
-    senza snapshot (usato solo se la URL è condivisa fuori sessione).
-- Alias legacy gestiti: `#atlas`, `#home`, `#atlas-full`, `#dossier/<id>`.
+- Hash-based:
+  - `#` (default) — home con Atlas mappa cliccabile.
+  - `#report/<N>` — scenario N rendered (snapshot in `scenarioHistory`).
+- Alias legacy: `#atlas`, `#home`, `#atlas-full`, `#dossier/<id>`.
 
-### 1.3 Working surface (schermata unica)
+### 1.3 Backend chat (live)
 
-Layout a 2 zone:
+Endpoint: `https://chuvfdbpwiszjuoyhvlw.supabase.co/functions/v1/geointel-reader-chat`.
+Modelli: Haiku 4.5 classifier (max_tokens 800), Sonnet 4.5 generator (max_tokens 5000).
 
-- **Chat panel** (340px, sinistra, sempre presente): una sola
-  conversazione globale `GLOBAL_CHAT`, identica fra home e report. Parte
-  dal greeting. Input operativo: Run accetta query, dispatch keyword →
-  dossier, append user+pending alla chat globale, naviga a
-  `#report/<id>`, risoluzione AI dopo ~900ms con chip `↗ Report #N`
-  cliccabile. Bottone **"New"** in header salva la conversazione in
-  localStorage e resetta a home + greeting.
-- **Right area** (flex 1, destra): Atlas cliccabile in stato home;
-  graph/intel upper-strip + report panel in stato report.
+- **Fase classifier** (~5 s): `Content-Type: application/json` buffered,
+  body tipizzato (`welcome`, `clarification`, `ready_to_generate`,
+  `out_of_scope`, `acknowledge`, `scenario_followup`).
+- **Fase generator** (~50 s): `Content-Type: application/x-ndjson` streaming.
+  Frame per riga: `{"type":"start"}`, `{"type":"heartbeat","t":<ms>}` ogni
+  ~15 s, `{"type":"done","payload":{type,message,scenario,debug}}` al
+  termine. Scenario porta `{title, report_html, entity_ids, relation_keys,
+  critical_edges, question}`.
 
-### 1.4 Atlas in home (cliccabile, apre info card)
+`readNdjsonDone` discrimina sul Content-Type: NDJSON → drain ReadableStream,
+ignora start/heartbeat, restituisce payload del done.
 
-**Nessun click sulla mappa naviga al report**. Il report è raggiungibile
-solo dalla chat. La mappa serve a informare, non a navigare. Interazioni:
+### 1.4 Working surface (schermata unica)
 
-- Click su **cluster con 1 dossier** → info card del dossier (descrizione
-  + actors + meta).
-- Click su **cluster con N dossier** (≥2) → **zoom-and-reveal**: viewBox
-  zooma sulla regione, i dossier appaiono come marker individuali ai
-  loro lat/lon reali. Oggi attivo su `middle-east` (iran-hormuz +
-  red-sea-houthis).
-- Click su **dossier marker** (in region view) → info card.
-- Click su **cluster vuoto** → pulse rosso del ring per feedback visivo
-  + no-op.
-- Click su **orbital dossier** (trans-geografici) → info card.
-- In stato zoomed, bottone **"← World"** nell'header riporta al world
-  level.
-- Info card: overlay in alto a destra della mappa, chiusura con ×.
+- **Chat panel** (340px, sinistra): `GLOBAL_CHAT[]` con bubble user/ai/
+  scenario-card. Scenario-card è chip cliccabile per recall senza nuova
+  fetch backend. Bottoni in header: **New** (archivia + reset), **Archive**.
+- **Right area**:
+  - Empty/home → Atlas ambient cliccabile.
+  - Loading → skeleton report durante generator.
+  - Populated → subgraph upper + report panel bottom.
 
-### 1.5 Ritorno ad Atlas dalla schermata report
+### 1.5 Atlas
 
-Topbar-left mostra **"← Atlas"** quando la route è `#report/<id>`.
-Cliccando si torna alla home con Atlas resettato a world level.
+Natural Earth 110m countries, proiezione Equal Earth. Cluster markers +
+orbital ring per trans-geographic. Click su cluster apre info card (mai
+naviga al report). Zoom-and-reveal per cluster N≥2 dossier (oggi attivo su
+`middle-east` con 3 dossier). Pulse rosso per cluster vuoti.
 
-### 1.6 Basemap più leggibile — countries con border interni
+### 1.6 Subgraph engine v2.4
 
-Dataset sostituito: ora usiamo Natural Earth 110m **admin_0 countries**
-(288 polygons) invece di land (127). I border interni — UK separata dal
-continente, Italia delineata, Iberia/Scandinavia divise, ecc. — rendono
-Europa visivamente distinguibile. Palette: water `#f4eee0`, land
-`#d8cfb6`, stroke `#6a6358`. Proiezione Equal Earth invariata. Polygons
-che attraversano l'antimeridiano vengono ancora skippati.
+- `renderSubgraph(container, scenario, fullscreen)` con force-directed
+  `computeForceLayoutV24`.
+- Callout numerati per `critical_edges` con mechanism + volatility.
+- Label inline per archi ordinari.
+- **Polarity color granulare** (v2.4.4): `pos`/`pos-*` verde, esatto `neg`
+  rosso, `neg-*`/`variable`/`systemic`/`commercial` grigio. I `neg-West`,
+  `neg-China`, ecc. sono allineamenti contro terzi, non antagonismi bilaterali.
+- **Orphan entity filter** (v2.4.4): strip di `entity_ids` non referenziati
+  in alcun `relation_key`.
+- Legenda spaziata flex + divider, presente inline e in overlay fullscreen.
+- Bottone "Expand" → fullscreen overlay (Esc to close).
 
-### 1.7 Dossier mock implementati
+### 1.7 Report
 
-Quattro dossier in `data.js`:
+- `renderScenarioReport(scenario)` renderizza `scenario.report_html` raw.
+- Chip in body cliccabili: `.chip.actor/.asset/.event` → highlight nodo.
+- Filtri grafo (Full/Actors/Assets/Events) attivi via `[data-graph-filter]`.
+- PDF: bottone in header → `window.print()` con stylesheet print dedicato.
 
-- `iran-hormuz` (Middle East).
-- `red-sea-houthis` (Middle East) — nuovo in v0.8.2, abilita il test
-  end-to-end del zoom-and-reveal sul cluster.
-- `taiwan-strait` (East Asia).
-- `ai-us-china` (trans-geografico, orbital ring).
+### 1.8 Archive drawer
 
-Ogni dossier ha ora il campo `actors: [...]` usato dall'info card.
+`localStorage["gir_chat_archive"]` — array `{startedAt, messages}`. Drawer
+laterale con titolo derivato dalla prima query, timestamp, msg count. Click
+ripristina GLOBAL_CHAT e ricostruisce scenarios dai chip. Delete singolo +
+Clear all. Al click su "New" si archivia automaticamente.
 
-### 1.8 Topbar
+### 1.9 Password gate (v2.4.5)
 
-- Brand — link a `#` (home).
-- Home: topbar minimale (solo brand + icon-buttons).
-- Report view: "← Atlas" a sinistra + pill "DOSSIER · TITLE" centrale.
-- Icon-buttons: export, share, settings (non funzionanti).
+Overlay fullscreen all'avvio. SHA-256 della password vs 2 hash autorizzati
+(user + emergency) via `crypto.subtle.digest`. Match → flag `gir_auth_ok` in
+`sessionStorage`. Idempotente contro render asincroni concorrenti.
 
-### 1.9 Chat mock dispatch
+### 1.10 On-screen debug log
 
-Keyword-based routing in `dispatchQuery()`:
+Ring buffer 40 entry, `debugLog()`, bottone copy (TSV). Indispensabile su
+iPad senza DevTools. Render() si triggera da debugLog solo dove esplicito.
 
-- `hormuz | iran | gulf | persian | gcc` → `iran-hormuz`
-- `houthi | red sea | bab | suez | ansar allah` → `red-sea-houthis`
-- `taiwan | china sea | tsmc | south china | formosa | pla` →
-  `taiwan-strait`
-- `ai | semiconductor | chip | lithography | asml | nvidia | tech rivalry`
-  → `ai-us-china`
-- fallback → `iran-hormuz`
+### 1.11 Sei dossier mock
 
-Su submit: append user+pending in `GLOBAL_CHAT`, navigate a
-`#report/<id>`, risoluzione AI dopo ~900ms con chip `↗ Report #N`
-cliccabile che riporta a quel report. `REPORT_COUNTER` incrementa ad
-ogni query.
+| ID | Cluster | Brief |
+|---|---|---|
+| `russia-ukraine` | eastern-europe | ~15 KB |
+| `iran-hormuz` | middle-east | ~10 KB |
+| `iran-usa` | middle-east | ~12 KB |
+| `taiwan-strait` | east-asia | ~13 KB |
+| `ai-us-china` | trans-geographic | ~14 KB |
+| `red-sea-houthis` | middle-east | ~10 KB |
 
-### 1.10 Archivio chat (localStorage-only, no UI)
-
-Al click su "New", se la conversazione corrente ha più del solo greeting,
-viene serializzata e append a `localStorage["gir_chat_archive"]` (array
-di `{startedAt, messages}`). Nessuna UI di browse in v0.8.2 — arriva in
-v0.8.3 come drawer laterale.
+KG globale 77 entities + 77 relations, mandato per intero come `kg` nel
+payload (Sonnet seleziona il sottografo).
 
 ---
 
@@ -133,90 +126,94 @@ v0.8.3 come drawer laterale.
 
 ### 2.1 Implementato
 
-- Working surface unica con routing `#` / `#report/<N>` / `#report/<id>`.
-- **Chat globale unificata** (`GLOBAL_CHAT`), conversazione persistente
-  attraverso home e report. Greeting iniziale, append user+pending su
-  submit, risoluzione AI con chip `↗ Report #N` cliccabile che naviga
-  allo snapshot indicizzato.
-- **Snapshot report/grafo per query** (`GENERATED_REPORTS[N]`): ogni
-  submit incrementa `REPORT_COUNTER` e produce uno snapshot
-  `{ dossierId, query, timestamp, reportNum }`. La route `#report/<N>`
-  risolve allo snapshot, il report panel mostra la byline "Triggered by"
-  con la query originale.
-- **Filtri grafo attivi**: Full/Actors/Assets/Events toggle filtrano il
-  rendering SVG via classificazione dei nodi (data-type in base allo
-  stroke color dei nodi: teal=actor, amber=asset, violet=event). CSS
-  regole `[data-graph-filter]` fanno sbiadire i non-matching.
-- **Link chip↔grafo**: click su una chip (`.chip.actor/.asset/.event`)
-  nel body del report evidenzia (drop-shadow + stroke-width) il nodo
-  corrispondente nel grafo via matching per label normalizzata.
-- **Archivio chat (drawer UI)**: bottone icona in chat header apre un
-  drawer a sinistra con la lista delle conversazioni archiviate
-  (`localStorage["gir_chat_archive"]`). Ogni entry ha titolo derivato
-  dalla prima user query, timestamp, contatore messaggi. Click su entry
-  ripristina `GLOBAL_CHAT` e ricostruisce gli snapshot dai chip
-  presenti. Delete singolo + "Clear all".
-- Bottone **"New"** in chat header → archivia in localStorage e resetta
-  a home + greeting.
-- Atlas home cliccabile che **apre info card** (mai naviga al report):
-  zoom-and-reveal per cluster multi-dossier, info card diretta per
-  mono-dossier e orbital, pulse sui cluster vuoti.
-- Info card overlay: descrizione, actor chips, meta.
-- Bottone "← Atlas" dalla schermata report.
-- Basemap Natural Earth 110m **countries** con border interni.
-- Design system applicato: Fraunces / Inter / JetBrains Mono, palette
-  light editoriale, bordi hairline.
-- Deploy Vercel zero-config funzionante.
+- Backend live Supabase + Haiku classifier + Sonnet generator con NDJSON
+  streaming.
+- Macchina a stati conversazionale: welcome → clarification (loop) →
+  ready_to_generate → scenario → scenario_followup.
+- Scenario history client-side con chip recall.
+- Subgraph rendering v2.4 (force-directed, critical edges, orphan filter,
+  polarity granulare).
+- Atlas cliccabile (info card, zoom-and-reveal, orbital ring).
+- Archive drawer con localStorage.
+- Graph fullscreen overlay.
+- Filtri grafo + chip↔grafo highlight.
+- PDF via window.print() con stylesheet dedicato.
+- Password gate SHA-256.
+- Debug log on-screen.
+- Sei dossier mock con brief_text + intel + reports + graph_svg statici.
 
-### 2.2 Non implementato (rimane oltre il mockup)
+### 2.2 Non implementato (rimane aperto)
 
-- **Contenuto report/grafo davvero nuovo per query**: lo snapshot
-  aggiunge metadata (query + timestamp), ma il body del report e il
-  grafo SVG restano quelli statici del dossier mock. La generazione
-  reale arriva con l'integrazione KB.
-- **Dispatch "vero"**: ancora keyword-based; evolverà con il back-end.
-- **PDF reale**: oggi è `window.print()` con print stylesheet. Per un
-  PDF server-side (impaginazione più controllata, watermark, ecc.)
-  serve un back-end.
-- **Integrazione reale con KB**: non ancora progettata — tutto mock in
-  `data.js`. Prossimo grande tema post-1.0.
+- **Report strutturato Tesi/Evidenze/Implicazione/Fonti** (oggi è blob
+  `report_html` libero — arriva in v2.5.0).
+- **Deep-Think mode** con alberatura e distribuzione esiti (v2.5.0).
+- **Auto-suggest DT** per query projection-heavy (v2.5.0).
+- **Dossier+topic attivo display** in UI (v2.5.0).
+- **Switch dossier confirmation** (v2.5.0).
+- **Cloudflare buffering fix** sull'Edge Function (richiede deploy
+  manuale di `X-Accel-Buffering: no` sul Response del branch streaming).
+- **PDF con grafo dentro**: oggi `window.print()` non include il grafo
+  correttamente. Tema aperto, decisione strategica futura.
+- **Integrazione KB reale** (dati mock, KG hardcoded). Tema post-pilot.
 
 ---
 
 ## 3. Prossimi step
 
-### 3.1 Post-1.0 — Integrazione KB reale
+### 3.1 v2.5.0 — Report strutturato, Deep-Think, dossier attivo
 
-Il mockup è chiuso con v1.0.0. Il prossimo salto è sostituire i dati
-hardcoded in `data.js` con chiamate al back-end GeoIntel · KB:
+Scope:
 
-- Endpoint query (RAG) che dato un testo restituisce dossier+report+grafo
-  pertinenti invece del dispatch keyword mock.
-- Persistenza lato server delle conversazioni (oggi solo localStorage).
-- Autenticazione utente.
-- Generazione PDF server-side per impaginazione controllata.
+1. **Report RAG strutturato** con sezioni esplicite Tesi / Lettura evidenze
+   / Implicazione / Sottografo / Fonti. Parsing client-side del
+   `report_html` esistente (heuristics su `<h2>` / primo paragrafo /
+   `<cite>`).
+2. **Bottone "Approfondisci con Deep-Think"** sotto il report, con stima
+   costo qualitativa (low/medium/high) calcolata da #entità + #archi +
+   presenza di linguaggio proiettivo.
+3. **Deep-Think mock client-side** (no nuova Edge Function): genera
+   alberatura attori×mosse×probabilità + distribuzione esiti (bar chart)
+   + caveat su incertezza, deterministicamente derivata dallo scenario
+   corrente.
+4. **Auto-suggest DT**: regex su query utente (orizzonte temporale, "se",
+   "what if", "controfattuale", "scenario futuro") → hint sopra il bottone.
+5. **Dossier+topic attivo**: pill in topbar/chat header con dossier
+   corrente (dallo scenario) + topic (prima query utente del turno).
+6. **Switch dossier confirmation**: modal "Vuoi cambiare dossier? Archivio
+   la conversazione e parto con nuovo contesto" se classificatore
+   identifica dossier diverso dal corrente. Default = archivia + procedi.
 
-Da definire insieme a KB quando si aprirà il tema integrazione.
+### 3.2 Edge Function — fix Cloudflare buffering (deploy manuale)
+
+Aggiungere header `X-Accel-Buffering: no` (+ idealmente `Connection:
+keep-alive`) al `Response` del branch streaming NDJSON. Snippet
+ready-to-paste consegnato separatamente.
+
+### 3.3 Beyond pilot
+
+- Integrazione KB reale (dati live da pgvector + RAG vero).
+- PDF server-side con grafo.
+- Persistenza chat lato server (oggi solo localStorage).
+- Autenticazione utenti reale (oggi password singola).
 
 ---
 
-## 4. Problemi aperti / note importanti
+## 4. Problemi aperti
 
-- **Design decisions già applicate** (v0.8.0 + v0.8.1):
-  - Chat è entrypoint primario, globale, persistente; operativa in mock.
-  - Dossier individuato dal sistema a partire dalla domanda, mai
-    selezionato dall'utente via menu.
-  - Atlas è **scorciatoia visuale cliccabile**, entrypoint secondario,
-    non c'è più vista full-screen separata.
-  - Cluster con N dossier: zoom-and-reveal in place.
-  - Basemap Natural Earth 110m, con stroke rinforzato per leggibilità.
-- **Dati mock**: il Reader mostra attualmente dati hardcoded in `data.js`.
-  L'integrazione reale con KB (via API Supabase o export statici) non è
-  ancora progettata — sarà affrontata dopo v1.0.0.
-- **iPad workflow**: le modifiche vanno fatte direttamente nel repo, niente
-  workflow copia-incolla dal chat. Claude Codice scrive, Working Copy pusha,
-  Vercel deploya.
-- **Modifiche complete**: poiché si sviluppa da iPad, ogni modifica deve
-  essere completa e testata. Niente snippet o patch parziali in sospeso.
-- **Non rimettere in discussione le decisioni architetturali** già prese
-  (vedi `CLAUDE.md` §7).
+- **Cloudflare buffering** (vedi §3.2): fetch muore a ~50 s con
+  `TypeError: Load failed`. Fix lato Edge Function richiesto.
+- **PDF con grafo**: `window.print()` come fallback, grafo non incluso
+  correttamente. Decisione strategica aperta.
+- **iPad Safari** quirks: disattivare "Punteggiatura intelligente" prima
+  di editare `.js` (curly quotes rompono parse).
+
+---
+
+## 5. Workflow di sviluppo
+
+- Commit diretti su `main` via PR mergiate.
+- Vercel deploy automatico su ogni push.
+- iPad: Working Copy `Pull` (non solo `Fetch`) per aggiornare.
+- Edge Function debug: Supabase Dashboard → Edge Functions →
+  `geointel-reader-chat` → Test panel.
+- On-screen debug log: ring buffer in chat panel, bottone `copy` TSV.

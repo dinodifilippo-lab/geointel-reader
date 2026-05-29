@@ -1,6 +1,6 @@
 // GeoIntel Reader - app.js - v2.4.5
 
-const APP_VERSION = "2.4.5";
+const APP_VERSION = "2.5.0";
 console.log("GeoIntel Reader " + APP_VERSION);
 
 // ============ ON-SCREEN DEBUG LOG ============
@@ -121,6 +121,7 @@ ATLAS_VIEW = { level: "world", clusterId: null };
 INFO_CARD = { open: false, type: null, id: null };
 GRAPH_HIGHLIGHT = null;
 ARCHIVE_OPEN = false;
+DT_STATE = { scenarioId: null, data: null, loading: false };
 if (window.location.hash) window.location.hash = "";
 else render();
 }
@@ -289,6 +290,7 @@ return '<aside class="chat-panel">' +
 '<span class="panel-meta">' + metaLabel + '</span>' +
 '</div>' +
 '</div>' +
+renderActiveContextPill() +
 '<div class="chat-messages' + (isEmpty ? ' empty' : '') + '" id="chat-messages">' +
 messagesHTML +
 '</div>' +
@@ -311,6 +313,25 @@ renderDebugPanel() +
 '</div>' +
 '</form>' +
 '</aside>';
+}
+
+function renderActiveContextPill() {
+const sc = getCurrentScenario();
+if (!sc) return '';
+const dossierId = deriveActiveDossier(sc);
+const dossier = dossierId && window.CHESS_DATA && window.CHESS_DATA.dossiers
+? window.CHESS_DATA.dossiers[dossierId]
+: null;
+const dossierLabel = dossier ? dossier.title : (dossierId || "?");
+const topic = (sc.question || sc.title || "").trim();
+const topicShort = topic.length > 60 ? topic.slice(0, 59) + "…" : topic;
+return '<div class="active-context-pill" aria-label="Active dossier and topic">' +
+'<div class="acp-row">' +
+'<span class="acp-label">Dossier attivo</span>' +
+'<span class="acp-value">' + escapeHTML(dossierLabel) + '</span>' +
+'</div>' +
+(topicShort ? '<div class="acp-row acp-topic"><span class="acp-label">Topic</span><span class="acp-value">' + escapeHTML(topicShort) + '</span></div>' : '') +
+'</div>';
 }
 
 function renderDebugPanel() {
@@ -509,7 +530,353 @@ return '<div class="report-empty">' +
 }
 
 function renderScenarioReport(scenario) {
-return scenario.report_html || renderReportEmpty();
+if (!scenario || !scenario.report_html) return renderReportEmpty();
+return renderStructuredReport(scenario);
+}
+
+// ============ V2.5 STRUCTURED REPORT (Tesi/Evidenze/Implicazione/Fonti) ============
+
+function renderStructuredReport(scenario) {
+const html = scenario.report_html || "";
+const tesi = extractTesi(html);
+const impl = extractImplicazione(html);
+const fonti = extractFonti(html);
+const isProj = isProjectionHeavy(scenario.question || "");
+const cost = estimateDTCost(scenario);
+const costLabel = cost.toUpperCase();
+const costClass = "dt-cost-" + cost;
+const dtState = (DT_STATE.scenarioId === scenario.id && DT_STATE.data) ? DT_STATE.data : null;
+const dtLoading = (DT_STATE.scenarioId === scenario.id && DT_STATE.loading);
+
+return '<div class="r-structured">' +
+'<section class="r-sec r-tesi">' +
+'<div class="r-label">Tesi</div>' +
+'<div class="r-tesi-body">' + tesi + '</div>' +
+'</section>' +
+'<section class="r-sec r-evidenze">' +
+'<div class="r-label">Lettura evidenze</div>' +
+'<div class="r-evidenze-body">' + html + '</div>' +
+'</section>' +
+'<section class="r-sec r-implicazione">' +
+'<div class="r-label">Implicazione</div>' +
+'<div class="r-implicazione-body">' + impl + '</div>' +
+'</section>' +
+'<section class="r-sec r-sottografo-anchor">' +
+'<div class="r-label">Sottografo</div>' +
+'<div class="r-sottografo-note">Il sottografo rilevante è visualizzato nel pannello in alto a sinistra. Apri <button class="r-inline-link" id="r-expand-sg" type="button">Expand</button> per visualizzarlo a tutto schermo.</div>' +
+'</section>' +
+'<section class="r-sec r-fonti">' +
+'<div class="r-label">Fonti citate</div>' +
+'<div class="r-fonti-body">' + fonti + '</div>' +
+'</section>' +
+'<section class="r-dt-cta">' +
+(isProj ? '<div class="r-dt-hint"><strong>Hint:</strong> questa domanda contiene linguaggio proiettivo (se / cosa accade / orizzonte temporale) e potrebbe beneficiare di un\'analisi Deep-Think.</div>' : '') +
+'<div class="r-dt-row">' +
+'<button class="r-dt-btn" id="r-dt-btn" data-scenario-id="' + escapeHTML(scenario.id) + '" type="button"' + (dtLoading ? ' disabled' : '') + '>' +
+'<span class="r-dt-btn-label">Approfondisci con Deep-Think</span>' +
+'<span class="r-dt-cost ' + costClass + '">cost: ' + costLabel + '</span>' +
+'</button>' +
+'<div class="r-dt-caveat">Deep-Think simula evoluzioni alternative dello scenario. È una proiezione, non una previsione.</div>' +
+'</div>' +
+'</section>' +
+(dtLoading ? renderDTLoading() : '') +
+(dtState ? renderDTReport(dtState) : '') +
+'</div>';
+}
+
+function extractTesi(html) {
+// Prefer first <p> in the document.
+const m = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+if (m && m[1]) {
+const inner = m[1].trim();
+if (inner.length > 20) return '<p>' + inner + '</p>';
+}
+// Fallback: first <h2> body or first sentence.
+const sent = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+const firstSentence = sent.split(/(?<=[.!?])\s/)[0] || sent.slice(0, 220);
+return '<p>' + escapeHTML(firstSentence) + '</p>';
+}
+
+function extractImplicazione(html) {
+// Prefer a paragraph after an h2 with "implicaz" / "what would shift" / "cosa cambierebbe".
+const reSection = /<h2[^>]*>[^<]*(implicaz|what would shift|cosa cambierebbe|conclusion|takeaway|conclusione)[\s\S]*?<\/h2>([\s\S]*?)(<h2|$)/i;
+const ms = html.match(reSection);
+if (ms && ms[2]) {
+const mp = ms[2].match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+if (mp && mp[1]) return '<p>' + mp[1].trim() + '</p>';
+}
+// Fallback: last <p> in the document.
+const all = html.match(/<p[^>]*>[\s\S]*?<\/p>/gi);
+if (all && all.length) {
+const last = all[all.length - 1];
+const innerMatch = last.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+if (innerMatch) return '<p>' + innerMatch[1].trim() + '</p>';
+}
+return '<p class="r-muted">Implicazione non identificabile automaticamente nel report.</p>';
+}
+
+function extractFonti(html) {
+// Collect <cite> entries from blockquote.pullquote elements.
+const cites = [];
+const re = /<cite[^>]*>([\s\S]*?)<\/cite>/gi;
+let m;
+while ((m = re.exec(html)) !== null) {
+const inner = m[1].replace(/<[^>]+>/g, "").trim();
+if (inner) cites.push(inner);
+}
+if (cites.length) {
+return '<ul class="r-fonti-list">' + cites.map(function(c) {
+return '<li>' + escapeHTML(c) + '</li>';
+}).join("") + '</ul>';
+}
+// Fallback: count of think tanks referenced if we have it.
+return '<p class="r-muted">Fonti citate inline nel testo del report (ECFR, ISPI, MERICS, Bruegel quando applicabili).</p>';
+}
+
+// ============ V2.5 DEEP-THINK STATE + DETECTION ============
+
+let DT_STATE = { scenarioId: null, data: null, loading: false };
+
+function isProjectionHeavy(query) {
+if (!query) return false;
+const q = query.toLowerCase();
+// Italian + English projection markers.
+const re = /\b(se\s|what if|cosa\s+accad|cosa\s+succede|tra\s+\d+\s+(giorni|settimane|mesi|anni)|in\s+the\s+next\s+\d+|nei\s+prossimi|scenario\s+(in\s+cui|alternativ|futur)|controfattual|counterfactual|projection|proiezione|orizzonte|horizon|finestra|window\s+(of|for)\s+a)\b/i;
+return re.test(q);
+}
+
+function estimateDTCost(scenario) {
+const nE = (scenario.entity_ids || []).length;
+const nR = (scenario.relation_keys || []).length;
+const nC = (scenario.critical_edges || []).length;
+const score = nE + nR * 0.6 + nC * 1.5;
+if (score < 14) return "low";
+if (score < 28) return "medium";
+return "high";
+}
+
+function deriveActiveDossier(scenario) {
+if (!scenario || !window.CHESS_DATA || !window.CHESS_DATA.kg) return null;
+const ents = window.CHESS_DATA.kg.entities || [];
+const ids = scenario.entity_ids || [];
+const counts = {};
+ids.forEach(function(id) {
+const e = ents.find(function(x) { return x.id === id; });
+if (!e || !Array.isArray(e.dossiers)) return;
+e.dossiers.forEach(function(d) { counts[d] = (counts[d] || 0) + 1; });
+});
+let bestId = null;
+let bestCount = -1;
+Object.keys(counts).forEach(function(k) {
+if (counts[k] > bestCount) { bestCount = counts[k]; bestId = k; }
+});
+return bestId;
+}
+
+function renderDTLoading() {
+return '<section class="dt-panel dt-loading">' +
+'<div class="dt-label">Deep-Think in corso<span class="dots"></span></div>' +
+'<div class="dt-loading-body">Simulazione alberature attori×mosse + distribuzione esiti.</div>' +
+'</section>';
+}
+
+function renderDTReport(dt) {
+return '<section class="dt-panel">' +
+'<div class="dt-header">' +
+'<div class="dt-eyebrow">Deep-Think</div>' +
+'<div class="dt-title">' + escapeHTML(dt.title) + '</div>' +
+'</div>' +
+'<section class="r-sec dt-revised">' +
+'<div class="r-label">Tesi rivista</div>' +
+'<div class="dt-revised-body">' + dt.tesi_rivista + '</div>' +
+'</section>' +
+'<section class="r-sec dt-tree-sec">' +
+'<div class="r-label">Alberatura attori × mosse × probabilità</div>' +
+'<div class="dt-tree-wrap">' + renderDTTree(dt.tree) + '</div>' +
+'</section>' +
+'<section class="r-sec dt-outcomes-sec">' +
+'<div class="r-label">Distribuzione esiti aggregata</div>' +
+'<div class="dt-outcomes-wrap">' + renderDTBarChart(dt.outcomes) + '</div>' +
+'</section>' +
+'<section class="r-sec dt-caveat-sec">' +
+'<div class="r-label">Caveat</div>' +
+'<div class="dt-caveat-body">' + dt.caveat + '</div>' +
+'</section>' +
+'</section>';
+}
+
+function renderDTTree(tree) {
+if (!tree || !tree.roots || !tree.roots.length) return '<div class="r-muted">Nessuna alberatura disponibile.</div>';
+const W = 720, H = 360;
+const cols = tree.roots.length;
+const colW = W / cols;
+let svg = '<svg class="dt-tree-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+tree.roots.forEach(function(root, i) {
+const rx = colW * i + colW / 2;
+const ry = 40;
+// Root node
+svg += '<g class="dt-tree-root"><circle cx="' + rx + '" cy="' + ry + '" r="20" fill="#e6f0ef" stroke="#0d7a6e" stroke-width="2"/>' +
+'<text x="' + rx + '" y="' + (ry + 4) + '" text-anchor="middle" class="dt-tree-actor-label">' + escapeHTML(truncateText(root.actor, 14)) + '</text></g>';
+// Child moves
+const moves = root.moves || [];
+const childY = 180;
+const childW = colW * 0.85;
+const startX = rx - childW / 2;
+const step = moves.length > 1 ? childW / (moves.length - 1) : 0;
+moves.forEach(function(mv, j) {
+const cx = moves.length === 1 ? rx : startX + step * j;
+const cy = childY;
+// Edge with probability
+const midX = (rx + cx) / 2;
+const midY = (ry + cy) / 2;
+svg += '<line x1="' + rx + '" y1="' + (ry + 20) + '" x2="' + cx + '" y2="' + (cy - 14) + '" stroke="#6a6358" stroke-width="' + (1 + mv.probability * 3).toFixed(1) + '" opacity="0.7"/>';
+svg += '<text x="' + midX + '" y="' + midY + '" text-anchor="middle" class="dt-tree-prob">' + Math.round(mv.probability * 100) + '%</text>';
+// Move node
+svg += '<g class="dt-tree-move"><rect x="' + (cx - 60) + '" y="' + (cy - 14) + '" width="120" height="46" rx="6" fill="#fafaf7" stroke="#a8570f" stroke-width="1.5"/>' +
+'<text x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" class="dt-tree-move-label">' + escapeHTML(truncateText(mv.label, 22)) + '</text>' +
+'<text x="' + cx + '" y="' + (cy + 22) + '" text-anchor="middle" class="dt-tree-move-outcome">→ ' + escapeHTML(truncateText(mv.outcome, 20)) + '</text></g>';
+});
+});
+svg += '</svg>';
+return svg;
+}
+
+function renderDTBarChart(outcomes) {
+if (!outcomes || !outcomes.length) return '<div class="r-muted">Nessuna distribuzione.</div>';
+const max = outcomes.reduce(function(a, b) { return Math.max(a, b.weight); }, 0) || 1;
+const colors = ["#b8203a", "#a8570f", "#8b5a00", "#15803d", "#0d7a6e"];
+const rows = outcomes.map(function(o, i) {
+const pct = Math.round(o.weight * 100);
+const w = (o.weight / max) * 100;
+const color = colors[i % colors.length];
+return '<div class="dt-bar-row">' +
+'<div class="dt-bar-label">' + escapeHTML(o.label) + '</div>' +
+'<div class="dt-bar-track">' +
+'<div class="dt-bar-fill" style="width:' + w.toFixed(1) + '%;background:' + color + '"></div>' +
+'</div>' +
+'<div class="dt-bar-pct">' + pct + '%</div>' +
+'</div>';
+}).join("");
+return '<div class="dt-bar-chart">' + rows + '</div>';
+}
+
+function truncateText(s, n) {
+const t = String(s || "");
+return t.length > n ? t.slice(0, n - 1) + "…" : t;
+}
+
+// ============ V2.5 DEEP-THINK MOCK GENERATOR ============
+
+function generateDTMock(scenario) {
+const seed = simpleSeedHash(scenario.id + "|" + (scenario.question || ""));
+const rng = seededRng(seed);
+const ents = (window.CHESS_DATA && window.CHESS_DATA.kg && window.CHESS_DATA.kg.entities) || [];
+const actorEnts = (scenario.entity_ids || [])
+.map(function(id) { return ents.find(function(e) { return e.id === id; }); })
+.filter(function(e) { return e && e.type === "actor"; });
+const fallbackEnts = (scenario.entity_ids || [])
+.map(function(id) { return ents.find(function(e) { return e.id === id; }); })
+.filter(Boolean);
+const actors = (actorEnts.length >= 2 ? actorEnts : fallbackEnts).slice(0, 3);
+if (!actors.length) {
+return {
+title: "Deep-Think · " + (scenario.title || "Scenario"),
+tesi_rivista: "<p>Non sono disponibili attori sufficienti per costruire un'alberatura significativa.</p>",
+tree: { roots: [] },
+outcomes: [],
+caveat: "<p>Senza attori espliciti nel sotto-grafo, la simulazione non è informativa.</p>"
+};
+}
+const moveTemplates = [
+{ label: "Forward posture", outcome: "Deterrenza visibile" },
+{ label: "Coercive signalling", outcome: "Tensione misurata" },
+{ label: "Hybrid pressure", outcome: "Erosione lenta" },
+{ label: "Backchannel talks", outcome: "Off-ramp parziale" },
+{ label: "Direct strike option", outcome: "Escalation aperta" },
+{ label: "Defensive consolidation", outcome: "Status quo prolungato" },
+{ label: "Coalition broadening", outcome: "Pressione multilaterale" },
+{ label: "Strategic ambiguity", outcome: "Incertezza calibrata" }
+];
+const roots = actors.map(function(actor) {
+const nMoves = 2 + Math.floor(rng() * 2);
+const picked = [];
+const seen = {};
+while (picked.length < nMoves) {
+const idx = Math.floor(rng() * moveTemplates.length);
+if (seen[idx]) continue;
+seen[idx] = true;
+picked.push(moveTemplates[idx]);
+}
+let total = 0;
+const probs = picked.map(function() { const v = 0.2 + rng() * 0.8; total += v; return v; });
+const normalized = probs.map(function(p) { return p / total; });
+return {
+actor: actor.label || actor.id,
+moves: picked.map(function(mv, j) {
+return { label: mv.label, outcome: mv.outcome, probability: normalized[j] };
+})
+};
+});
+const outcomeBuckets = [
+{ label: "Escalation forte", weight: 0.05 + rng() * 0.25 },
+{ label: "Escalation moderata", weight: 0.1 + rng() * 0.25 },
+{ label: "Status quo prolungato", weight: 0.15 + rng() * 0.25 },
+{ label: "De-escalation parziale", weight: 0.1 + rng() * 0.2 },
+{ label: "De-escalation netta", weight: 0.03 + rng() * 0.15 }
+];
+const sum = outcomeBuckets.reduce(function(a, b) { return a + b.weight; }, 0);
+outcomeBuckets.forEach(function(b) { b.weight = b.weight / sum; });
+const tesi_rivista = '<p>Dopo simulazione su <strong>' + roots.length + ' attori</strong> e <strong>' +
+roots.reduce(function(a, r) { return a + r.moves.length; }, 0) + ' mosse</strong>, lo scenario corrente si mantiene in equilibrio dominato da <em>' +
+outcomeBuckets.slice().sort(function(a, b) { return b.weight - a.weight; })[0].label.toLowerCase() +
+'</em>. La probabilità di escalation aperta resta contenuta ma non trascurabile.</p>';
+const caveat = '<p>Le probabilità nell\'alberatura sono <strong>indicative</strong>, derivate da un mock deterministico ' +
+'sullo scenario corrente — non da una simulazione Monte Carlo né da un modello calibrato. Servono a strutturare il ragionamento, ' +
+'non a fare previsioni puntuali. La distribuzione esiti aggregata riflette l\'incertezza sistemica del dossier.</p>';
+return {
+title: "Deep-Think · " + (scenario.title || "Scenario"),
+tesi_rivista: tesi_rivista,
+tree: { roots: roots },
+outcomes: outcomeBuckets,
+caveat: caveat
+};
+}
+
+function simpleSeedHash(s) {
+let h = 0;
+for (let i = 0; i < s.length; i++) {
+h = ((h << 5) - h) + s.charCodeAt(i);
+h |= 0;
+}
+return Math.abs(h) || 1;
+}
+
+function seededRng(seed) {
+let state = seed >>> 0;
+return function() {
+state = (state * 1664525 + 1013904223) >>> 0;
+return state / 0x100000000;
+};
+}
+
+function startDeepThink(scenarioId) {
+const sc = scenarioHistory.find(function(s) { return s.id === scenarioId; });
+if (!sc) return;
+DT_STATE = { scenarioId: scenarioId, data: null, loading: true };
+render();
+setTimeout(function() {
+const dt = generateDTMock(sc);
+DT_STATE = { scenarioId: scenarioId, data: dt, loading: false };
+GLOBAL_CHAT.push({
+role: "ai",
+time: formatNow(),
+text: "Deep-Think completato sullo scenario corrente. <strong>" +
+(dt.tree && dt.tree.roots ? dt.tree.roots.length : 0) + " attori</strong>, " +
+(dt.outcomes ? dt.outcomes.length : 0) + " esiti aggregati.",
+type: "deepthink"
+});
+render();
+}, 1100);
 }
 
 // ============ MAP RENDERING ============
@@ -618,6 +985,16 @@ const newBtn = document.getElementById("new-chat-btn");
 if (newBtn) newBtn.addEventListener("click", newChat);
 const archBtn = document.getElementById("archive-btn");
 if (archBtn) archBtn.addEventListener("click", function() { ARCHIVE_OPEN = !ARCHIVE_OPEN; render(); });
+const dtBtn = document.getElementById("r-dt-btn");
+if (dtBtn) dtBtn.addEventListener("click", function() {
+const sid = dtBtn.getAttribute("data-scenario-id");
+if (sid) startDeepThink(sid);
+});
+const sgExpand = document.getElementById("r-expand-sg");
+if (sgExpand) sgExpand.addEventListener("click", function() {
+GRAPH_OVERLAY_OPEN = true;
+render();
+});
 const backBtn = document.getElementById("back-to-atlas");
 if (backBtn) backBtn.addEventListener("click", function(e) {
 e.preventDefault();
@@ -1086,8 +1463,36 @@ relation_keys: Array.isArray(data.scenario.relation_keys) ? data.scenario.relati
 critical_edges: Array.isArray(data.scenario.critical_edges) ? data.scenario.critical_edges.slice() : [],
 created_at: new Date().toISOString()
 };
+const prevSc = scenarioHistory.length > 0 ? scenarioHistory[scenarioHistory.length - 1] : null;
+const prevDossier = prevSc ? deriveActiveDossier(prevSc) : null;
+const newDossier = deriveActiveDossier(scenarioObj);
+if (prevDossier && newDossier && prevDossier !== newDossier) {
+// Auto-archive previous conversation chunk to keep scope clean.
+try {
+const raw = localStorage.getItem("gir_chat_archive") || "[]";
+const arr = JSON.parse(raw);
+arr.push({
+startedAt: Date.now(),
+messages: GLOBAL_CHAT.slice(),
+auto_archived_on_dossier_switch: true,
+from_dossier: prevDossier,
+to_dossier: newDossier
+});
+localStorage.setItem("gir_chat_archive", JSON.stringify(arr));
+debugLog("DOSSIER SWITCH", prevDossier + " -> " + newDossier + " (chat auto-archived)");
+} catch (e) {
+console.warn("Auto-archive failed:", e);
+}
+GLOBAL_CHAT.push({
+role: "ai",
+time: now,
+text: "Cambio dossier rilevato (<strong>" + escapeHTML(prevDossier) + "</strong> → <strong>" + escapeHTML(newDossier) + "</strong>). La conversazione precedente è stata archiviata; il nuovo contesto parte ora.",
+type: "dossier-switch"
+});
+}
 scenarioHistory.push(scenarioObj);
 currentScenarioIndex = scenarioHistory.length - 1;
+DT_STATE = { scenarioId: null, data: null, loading: false };
 GLOBAL_CHAT.push({
 role: "scenario-card",
 time: now,
